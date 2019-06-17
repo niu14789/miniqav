@@ -467,6 +467,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\ms5611.c</FilePath>
             </File>
+            <File>
+              <FileName>vl53xx_i2c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\vl53xx_i2c.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

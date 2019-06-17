@@ -78,11 +78,21 @@ int mpu9250_Init( void * dev );
 void READ_MPU9250_ACCEL(void);
 void READ_MPU9250_GYRO(void);
 int vl53lxx_Init( void * dev );
+void vl53l0xSetParam(void);
+unsigned short vl53l0xReadRangeContinuousMillimeters(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+static unsigned int time_tick = 0;
+
+volatile float range_last = 0;
+
+void HAL_IncTick(void)
+{
+	time_tick ++;
+}
 /* USER CODE END 0 */
 
 /**
@@ -122,13 +132,17 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_FATFS_Init();
-  MX_USB_DEVICE_Init();
+//  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
   W25QXX_Init();
 	nrf24L01_Init(&nrf_dev,&hspi1,0);
 	pwm3901_Init(&hspi3);
 	mpu9250_Init(&hspi3);
+	
 	vl53lxx_Init(&hi2c1);
+	
+	vl53l0xSetParam();
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -136,9 +150,17 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-   READ_MPU9250_GYRO();
-	 READ_MPU9250_ACCEL();
-    /* USER CODE BEGIN 3 */
+	 if( !(time_tick % 10) )
+	 {		 
+		 READ_MPU9250_GYRO();
+		 READ_MPU9250_ACCEL();
+	 }
+	 /*-------------------*/
+	 if( !(time_tick % 30) )
+	 {
+		 range_last = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
+	 }
+   /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
