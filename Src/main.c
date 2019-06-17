@@ -72,6 +72,8 @@ static void MX_SPI2_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
+void opticalFlowInit(void);
+void opticalFlowTask(void *param);
 /* USER CODE BEGIN PFP */
 int pwm3901_Init( void * dev );
 int mpu9250_Init( void * dev );
@@ -79,6 +81,7 @@ void READ_MPU9250_ACCEL(void);
 void READ_MPU9250_GYRO(void);
 int vl53lxx_Init( void * dev );
 void vl53l0xSetParam(void);
+unsigned char getOpFlowData(void);
 unsigned short vl53l0xReadRangeContinuousMillimeters(void);
 /* USER CODE END PFP */
 
@@ -143,6 +146,8 @@ int main(void)
 	
 	vl53l0xSetParam();
 	
+	opticalFlowInit();
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -156,9 +161,15 @@ int main(void)
 		 READ_MPU9250_ACCEL();
 	 }
 	 /*-------------------*/
-	 if( !(time_tick % 30) )
+	 if( !(time_tick % 100) )
 	 {
-		 range_last = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
+		 //range_last = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
+		 getOpFlowData();
+	 }
+	 /*-------------------*/
+	 if( !(time_tick % 10) )
+	 {
+		 opticalFlowTask(0);
 	 }
    /* USER CODE BEGIN 3 */
   }
