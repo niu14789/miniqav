@@ -32,7 +32,9 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+void W25QXX_Init(void);
+void W25QXX_Read(unsigned char* pBuffer,unsigned int ReadAddr,unsigned short NumByteToRead) ;
+void W25QXX_Write(unsigned char* pBuffer,unsigned int WriteAddr,unsigned short NumByteToWrite)   ;
 /* USER CODE END PV */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
@@ -64,7 +66,7 @@
   */
 
 #define STORAGE_LUN_NBR                  1
-#define STORAGE_BLK_NBR                  0x10000
+#define STORAGE_BLK_NBR                  8192
 #define STORAGE_BLK_SIZ                  0x200
 
 /* USER CODE BEGIN PRIVATE_DEFINES */
@@ -178,6 +180,8 @@ USBD_StorageTypeDef USBD_Storage_Interface_fops_FS =
 int8_t STORAGE_Init_FS(uint8_t lun)
 {
   /* USER CODE BEGIN 2 */
+  W25QXX_Init();
+	/* return */
   return (USBD_OK);
   /* USER CODE END 2 */
 }
@@ -230,6 +234,8 @@ int8_t STORAGE_IsWriteProtected_FS(uint8_t lun)
 int8_t STORAGE_Read_FS(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_len)
 {
   /* USER CODE BEGIN 6 */
+	W25QXX_Read(buf,blk_addr*512,blk_len*512);
+	/* return */
   return (USBD_OK);
   /* USER CODE END 6 */
 }
@@ -242,6 +248,8 @@ int8_t STORAGE_Read_FS(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t bl
 int8_t STORAGE_Write_FS(uint8_t lun, uint8_t *buf, uint32_t blk_addr, uint16_t blk_len)
 {
   /* USER CODE BEGIN 7 */
+	W25QXX_Write(buf,blk_addr*512,blk_len*512);
+	/* return */
   return (USBD_OK);
   /* USER CODE END 7 */
 }

@@ -314,7 +314,7 @@ void opticalFlowTask(void *param)
 	HAL_UART_Transmit(&huart1,(unsigned char *)&pixelDx,2,0xffffffff);
 
 }
-unsigned char getOpFlowData(void)
+unsigned char getOpFlowData(float * a,float * b)
 {
 	static unsigned char cnt = 0;
 		
@@ -344,7 +344,10 @@ unsigned char getOpFlowData(void)
 		opFlow.posSum[0] += opFlow.deltaPos[0];	/*累积位移 cm*/
 		opFlow.posSum[1] += opFlow.deltaPos[1];	/*累积位移 cm*/
 	}
-		
+  
+   *a = opFlow.deltaVel[0];
+   *b = opFlow.deltaVel[1];
+	
 	return opFlow.isOpFlowOk;	/*返回光流状态*/
 }
 

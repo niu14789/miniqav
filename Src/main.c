@@ -77,25 +77,67 @@ void opticalFlowTask(void *param);
 /* USER CODE BEGIN PFP */
 int pwm3901_Init( void * dev );
 int mpu9250_Init( void * dev );
-void READ_MPU9250_ACCEL(void);
-void READ_MPU9250_GYRO(void);
+void READ_MPU9250_ACCEL(float * ax,float *ay,float *az);
+void READ_MPU9250_GYRO(float * gx,float *gy,float *gz);
 int vl53lxx_Init( void * dev );
 void vl53l0xSetParam(void);
-unsigned char getOpFlowData(void);
+unsigned char getOpFlowData(float * a,float * b);
 unsigned short vl53l0xReadRangeContinuousMillimeters(void);
+uint32_t HAL_GetTick(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+typedef struct
+{
+	short ax;
+	short ay;
+	short az;
+	short gx;
+	short gy;
+	short gz;
+	short height;
+	short optx;
+  short opty;	
+	short tmp1;
+	short tmp2;
+	short tmp3;
+	short tmp4;
+	short tmp5;
+	short tmp6;
+	short tmp7;
+}save_type;
+
+save_type stl;
+
+short Float2Short( float a, float b)
+{
+	float d;
+	d=(a/b*32768.0f);
+	if (d>32767.0f)
+	{
+		d=32767.0f;
+	}
+	else if(d<=-32768.0f)
+	{
+		d=-32768.0f;
+	}
+	return (short)d;
+}
+
 static unsigned int time_tick = 0;
 
 volatile float range_last = 0;
 
-void HAL_IncTick(void)
-{
-	time_tick ++;
-}
+/*-----  static fatfs varity   -----*/
+const DWORD plist[] = {100,0, 0, 0}; 
+BYTE work[_MAX_SS];
+FATFS fs;
+FIL fsrc;
+UINT  bw;
+FILINFO fno; 
+
 /* USER CODE END 0 */
 
 /**
@@ -135,7 +177,11 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_FATFS_Init();
-//  MX_USB_DEVICE_Init();
+	if( HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_8) == GPIO_PIN_SET )
+	{
+		MX_USB_DEVICE_Init();
+		while(1);
+	}
   /* USER CODE BEGIN 2 */
   W25QXX_Init();
 	nrf24L01_Init(&nrf_dev,&hspi1,0);
@@ -148,30 +194,102 @@ int main(void)
 	
 	opticalFlowInit();
 	
+/* create sector list */
+
+  FRESULT res;
+
+	/* mount the emmc disk */
+	res = f_mount(&fs,"0:", 1);
+	/* is ok ?*/
+	if( res != FR_OK )
+	{
+		while(1);
+	}
+	
+	res = f_open(&fsrc,"0:/test.log",FA_CREATE_ALWAYS|FA_WRITE);
+	
+	if( res != FR_OK )
+	{
+		while(1);
+	}
+	
+//
+//	res = f_write(&fsrc,"12ee3",5,&bw);
+////
+//	if( res != FR_OK )
+//	{
+//		while(1);
+//	}	
+//	
+//  res = f_sync(&fsrc);
+//	
+//	if( res != FR_OK )
+//	{
+//		while(1);
+//	}	
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	
+	float ft[8];
+	static unsigned short save_ctrl = 0;
+	
   while (1)
   {
-    /* USER CODE END WHILE */
-	 if( !(time_tick % 10) )
-	 {		 
-		 READ_MPU9250_GYRO();
-		 READ_MPU9250_ACCEL();
-	 }
-	 /*-------------------*/
-	 if( !(time_tick % 100) )
-	 {
-		 //range_last = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
-		 getOpFlowData();
-	 }
-	 /*-------------------*/
-	 if( !(time_tick % 10) )
-	 {
-		 opticalFlowTask(0);
-	 }
-   /* USER CODE BEGIN 3 */
+		 time_tick = HAL_GetTick();
+		 /* USER CODE END WHILE */
+		 if( !(time_tick % 10) )
+		 {		 
+			 READ_MPU9250_GYRO(&ft[0],&ft[1],&ft[2]);
+			 READ_MPU9250_ACCEL(&ft[3],&ft[4],&ft[5]);
+			 /*------------------*/
+			 stl.gx = Float2Short(ft[0],5);
+			 stl.gy = Float2Short(ft[1],5);
+			 stl.gz = Float2Short(ft[2],5);
+			 stl.ax = Float2Short(ft[3],20);
+			 stl.ay = Float2Short(ft[4],20);
+			 stl.az = Float2Short(ft[5],20);
+		 }
+		 /*-------------------*/
+		 if( !(time_tick % 100) )
+		 {
+			 stl.height = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
+			 getOpFlowData(&ft[6],&ft[7]);
+			 stl.optx = Float2Short(ft[6],200);
+			 stl.opty = Float2Short(ft[7],200);
+		 }
+		 /*-------------------*/
+		 if( !(time_tick % 10) )
+		 {
+			 opticalFlowTask(0);
+			 /*--------------*/
+			 res = f_write(&fsrc,(const void *)&stl,sizeof(stl),&bw);
+			 if( res != FR_OK )
+			 {
+				while(1);
+			 }	
+			
+			 save_ctrl++;
+			 
+			 if( save_ctrl >= 16 )//16*32 = 512
+			 {
+	       save_ctrl = 0;
+				 res = f_sync(&fsrc);
+				
+				 if( res != FR_OK )
+				 {
+					 while(1);
+				 }			 
+		   }
+		 }
+		 /* resd */
+		 if( HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_8) == GPIO_PIN_SET )
+		 {
+			 NVIC_SystemReset();	
+		 }
+		 /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -363,7 +481,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;

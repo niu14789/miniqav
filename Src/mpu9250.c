@@ -94,7 +94,7 @@ float acce[3];
 
 
 
-void READ_MPU9250_ACCEL(void)//
+void READ_MPU9250_ACCEL(float * ax,float *ay,float *az)//
 { 
    unsigned char BUF[6];
 	 short Accel[3];
@@ -110,25 +110,34 @@ void READ_MPU9250_ACCEL(void)//
    BUF[5]=mpu9250_read_reg(ACCEL_ZOUT_H);
    Accel[2]=  (BUF[5]<<8)|BUF[4];
    acce[2] = Accel[2] * accel_sensitivity;
+	 /*-------------------*/
+	 *ax = acce[0];
+	 *ay = acce[1];
+	 *az = acce[2];
+	 /*-------------------*/
 }
 /**********************ÍÓÂÝÒÇ¶ÁÈ¡*****************************/
-void READ_MPU9250_GYRO()
+void READ_MPU9250_GYRO(float * gx,float *gy,float *gz)
 { 
-   unsigned char BUF[6];
-	 short Gyro[3];
-   BUF[0]=mpu9250_read_reg(GYRO_XOUT_L); 
-   BUF[1]=mpu9250_read_reg(GYRO_XOUT_H);
-   Gyro[0]=	(BUF[1]<<8)|BUF[0];
-  gyro[0] = Gyro[0] * gyro_sensitivity;
-
-   BUF[2]=mpu9250_read_reg(GYRO_YOUT_L);
-   BUF[3]=mpu9250_read_reg(GYRO_YOUT_H);
-   Gyro[1]=	(BUF[3]<<8)|BUF[2];
-  gyro[1] = Gyro[1] * gyro_sensitivity;
-   BUF[4]=mpu9250_read_reg(GYRO_ZOUT_L);
-   BUF[5]=mpu9250_read_reg(GYRO_ZOUT_H);
-   Gyro[2]=	(BUF[5]<<8)|BUF[4];
-  gyro[2] = Gyro[2] * gyro_sensitivity;
+		unsigned char BUF[6];
+		short Gyro[3];
+		BUF[0]=mpu9250_read_reg(GYRO_XOUT_L); 
+		BUF[1]=mpu9250_read_reg(GYRO_XOUT_H);
+		Gyro[0]=	(BUF[1]<<8)|BUF[0];
+		gyro[0] = Gyro[0] * gyro_sensitivity;
+		BUF[2]=mpu9250_read_reg(GYRO_YOUT_L);
+		BUF[3]=mpu9250_read_reg(GYRO_YOUT_H);
+		Gyro[1]=	(BUF[3]<<8)|BUF[2];
+		gyro[1] = Gyro[1] * gyro_sensitivity;
+		BUF[4]=mpu9250_read_reg(GYRO_ZOUT_L);
+		BUF[5]=mpu9250_read_reg(GYRO_ZOUT_H);
+		Gyro[2]=	(BUF[5]<<8)|BUF[4];
+		gyro[2] = Gyro[2] * gyro_sensitivity;
+	  /*----------------*/
+		*gx = gyro[0];
+	  *gy = gyro[1];
+	  *gz = gyro[2];
+	  /*----------------*/
 }
 
 /* USER CODE END */
