@@ -204,6 +204,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+	MX_FATFS_Init();
   W25QXX_Init();
 	nrf24L01_Init(&nrf_dev,&hspi1,0);
 	pwm3901_Init(&hspi3);
@@ -234,20 +235,20 @@ int main(void)
 		while(1);
 	}
 	
+
+	res = f_write(&fsrc,"12ee3",5,&bw);
 //
-//	res = f_write(&fsrc,"12ee3",5,&bw);
-////
-//	if( res != FR_OK )
-//	{
-//		while(1);
-//	}	
-//	
-//  res = f_sync(&fsrc);
-//	
-//	if( res != FR_OK )
-//	{
-//		while(1);
-//	}	
+	if( res != FR_OK )
+	{
+		while(1);
+	}	
+	
+  res = f_sync(&fsrc);
+	
+	if( res != FR_OK )
+	{
+		while(1);
+	}	
 	
   /* USER CODE END 2 */
 
