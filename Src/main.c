@@ -20,6 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_device.h"
 
@@ -58,6 +59,7 @@ TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 
+osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 dev_HandleTypeDef nrf_dev;
 /* USER CODE END PV */
@@ -72,8 +74,8 @@ static void MX_SPI2_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
-void opticalFlowInit(void);
-void opticalFlowTask(void *param);
+void StartDefaultTask(void const * argument);
+
 /* USER CODE BEGIN PFP */
 int pwm3901_Init( void * dev );
 int mpu9250_Init( void * dev );
@@ -138,6 +140,31 @@ FIL fsrc;
 UINT  bw;
 FILINFO fno; 
 
+void radiolinkTask(void *param)
+{
+	unsigned int lastWakeTime;
+	vTaskDelayUntil(&lastWakeTime, 2);
+	( void) param;
+	
+	while(1)
+	{
+		vTaskDelay(5);
+	}
+}
+void radio3k(void *param)
+{
+  
+	unsigned int lastWakeTime;
+	
+	( void) param;
+	
+	while(1)
+	{
+		vTaskDelayUntil(&lastWakeTime, 5);
+		GPIOA->ODR ^= 1<<9 | 1<< 10;
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -176,12 +203,6 @@ int main(void)
   MX_SPI3_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
-  MX_FATFS_Init();
-	if( HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_8) == GPIO_PIN_SET )
-	{
-		MX_USB_DEVICE_Init();
-		while(1);
-	}
   /* USER CODE BEGIN 2 */
   W25QXX_Init();
 	nrf24L01_Init(&nrf_dev,&hspi1,0);
@@ -230,8 +251,40 @@ int main(void)
 	
   /* USER CODE END 2 */
 
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of defaultTask */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  osKernelStart();
+  
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	
+	
 	
 	float ft[8];
 	static unsigned short save_ctrl = 0;
@@ -239,57 +292,9 @@ int main(void)
   while (1)
   {
 		 time_tick = HAL_GetTick();
-		 /* USER CODE END WHILE */
-		 if( !(time_tick % 10) )
-		 {		 
-			 READ_MPU9250_GYRO(&ft[0],&ft[1],&ft[2]);
-			 READ_MPU9250_ACCEL(&ft[3],&ft[4],&ft[5]);
-			 /*------------------*/
-			 stl.gx = Float2Short(ft[0],5);
-			 stl.gy = Float2Short(ft[1],5);
-			 stl.gz = Float2Short(ft[2],5);
-			 stl.ax = Float2Short(ft[3],20);
-			 stl.ay = Float2Short(ft[4],20);
-			 stl.az = Float2Short(ft[5],20);
-		 }
-		 /*-------------------*/
-		 if( !(time_tick % 100) )
-		 {
-			 stl.height = (float)vl53l0xReadRangeContinuousMillimeters() * 0.1f;
-			 getOpFlowData(&ft[6],&ft[7]);
-			 stl.optx = Float2Short(ft[6],200);
-			 stl.opty = Float2Short(ft[7],200);
-		 }
-		 /*-------------------*/
-		 if( !(time_tick % 10) )
-		 {
-			 opticalFlowTask(0);
-			 /*--------------*/
-			 res = f_write(&fsrc,(const void *)&stl,sizeof(stl),&bw);
-			 if( res != FR_OK )
-			 {
-				while(1);
-			 }	
-			
-			 save_ctrl++;
-			 
-			 if( save_ctrl >= 16 )//16*32 = 512
-			 {
-	       save_ctrl = 0;
-				 res = f_sync(&fsrc);
-				
-				 if( res != FR_OK )
-				 {
-					 while(1);
-				 }			 
-		   }
-		 }
-		 /* resd */
-		 if( HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_8) == GPIO_PIN_SET )
-		 {
-			 NVIC_SystemReset();	
-		 }
-		 /* USER CODE BEGIN 3 */
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -481,7 +486,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -713,6 +718,30 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used 
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void const * argument)
+{
+  /* init code for FATFS */
+  MX_FATFS_Init();
+
+  /* init code for USB_DEVICE */
+  MX_USB_DEVICE_Init();
+
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */ 
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
