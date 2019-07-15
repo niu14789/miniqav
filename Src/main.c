@@ -26,9 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "dev.h"
-#include "w25qxx.h"
-#include "nrf24l01.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,7 +59,7 @@ UART_HandleTypeDef huart1;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-dev_HandleTypeDef nrf_dev;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,93 +75,11 @@ static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
-int pwm3901_Init( void * dev );
-int mpu9250_Init( void * dev );
-void READ_MPU9250_ACCEL(float * ax,float *ay,float *az);
-void READ_MPU9250_GYRO(float * gx,float *gy,float *gz);
-int vl53lxx_Init( void * dev );
-void vl53l0xSetParam(void);
-unsigned char getOpFlowData(float * a,float * b);
-unsigned short vl53l0xReadRangeContinuousMillimeters(void);
-uint32_t HAL_GetTick(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-typedef struct
-{
-	short ax;
-	short ay;
-	short az;
-	short gx;
-	short gy;
-	short gz;
-	short height;
-	short optx;
-  short opty;	
-	short tmp1;
-	short tmp2;
-	short tmp3;
-	short tmp4;
-	short tmp5;
-	short tmp6;
-	short tmp7;
-}save_type;
-
-save_type stl;
-
-short Float2Short( float a, float b)
-{
-	float d;
-	d=(a/b*32768.0f);
-	if (d>32767.0f)
-	{
-		d=32767.0f;
-	}
-	else if(d<=-32768.0f)
-	{
-		d=-32768.0f;
-	}
-	return (short)d;
-}
-
-static unsigned int time_tick = 0;
-
-volatile float range_last = 0;
-
-/*-----  static fatfs varity   -----*/
-const DWORD plist[] = {100,0, 0, 0}; 
-BYTE work[_MAX_SS];
-FATFS fs;
-FIL fsrc;
-UINT  bw;
-FILINFO fno; 
-
-void radiolinkTask(void *param)
-{
-	unsigned int lastWakeTime;
-	vTaskDelayUntil(&lastWakeTime, 2);
-	( void) param;
-	
-	while(1)
-	{
-		vTaskDelay(5);
-	}
-}
-void radio3k(void *param)
-{
-  
-	unsigned int lastWakeTime;
-	
-	( void) param;
-	
-	while(1)
-	{
-		vTaskDelayUntil(&lastWakeTime, 5);
-		GPIOA->ODR ^= 1<<9 | 1<< 10;
-	}
-}
 
 /* USER CODE END 0 */
 
@@ -204,52 +120,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	MX_FATFS_Init();
-  W25QXX_Init();
-	nrf24L01_Init(&nrf_dev,&hspi1,0);
-	pwm3901_Init(&hspi3);
-	mpu9250_Init(&hspi3);
-	
-	vl53lxx_Init(&hi2c1);
-	
-	vl53l0xSetParam();
-	
-	opticalFlowInit();
-	
-/* create sector list */
 
-  FRESULT res;
-
-	/* mount the emmc disk */
-	res = f_mount(&fs,"0:", 1);
-	/* is ok ?*/
-	if( res != FR_OK )
-	{
-		while(1);
-	}
-	
-	res = f_open(&fsrc,"0:/test.log",FA_CREATE_ALWAYS|FA_WRITE);
-	
-	if( res != FR_OK )
-	{
-		while(1);
-	}
-	
-
-	res = f_write(&fsrc,"12ee3",5,&bw);
-//
-	if( res != FR_OK )
-	{
-		while(1);
-	}	
-	
-  res = f_sync(&fsrc);
-	
-	if( res != FR_OK )
-	{
-		while(1);
-	}	
-	
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -284,15 +155,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	
-	
-	
-	float ft[8];
-	static unsigned short save_ctrl = 0;
-	
   while (1)
   {
-		 time_tick = HAL_GetTick();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -449,7 +313,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -487,7 +351,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -525,7 +389,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
