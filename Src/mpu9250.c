@@ -22,12 +22,35 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "dev.h"
+#include "fs.h"
+#include "f_shell.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "mpu9250.h"
 
 const float gyro_sensitivity  = 1 / 32.8f / 180.0f * 3.1415926f;
 const float accel_sensitivity = 1 / 4096.0f * 9.788f;
+
+unsigned char test[5];
+
+int ocm_heap_init(void);
+
+FS_INODE_REGISTER("/ocm.d",ocm0,ocm_heap_init,0);
+FS_INODE_REGISTER("/ocm.d",ocm1,ocm_heap_init,4);
+FS_INODE_REGISTER("/ocm.d",ocm2,ocm_heap_init,3);
+FS_INODE_REGISTER("/ocm.d",ocm3,ocm_heap_init,1);
+FS_INODE_REGISTER("/ocm.d",ocm4,ocm_heap_init,2);
+
+FS_SHELL_STATIC(test1,test,0x010001,_CB_RT_);
+FS_SHELL_STATIC(test2,test,0x010001,_CB_RT_);
+FS_SHELL_STATIC(test3,test,0x010001,_CB_RT_);
+FS_SHELL_STATIC(test4,test,0x010001,_CB_RT_);
+FS_SHELL_STATIC(test5,test,0x010001,_CB_RT_);
+
+int ocm_heap_init(void)
+{
+	return FS_OK;
+}
 
 /* USER CODE END Includes */
 SPI_HandleTypeDef * mpu_spi_handle;

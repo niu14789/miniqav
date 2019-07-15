@@ -8,10 +8,8 @@
 #include "fs_allocate.h"
 /* default the root pointer */
 static inode_vmn * p_vmn_link_header = (void*)0;
-/* some defes */
-static inode_vmn * system_runtime = 0;
 /* callback */
-callback_function isr[64];
+static struct shell_cmd * p_shell_link_base = (void*)0;
 /* system insert */
 static int system_insert(inode_vmn * p_vmn)
 {
@@ -49,7 +47,8 @@ static int system_insert(inode_vmn * p_vmn)
 						/*----------------------------*/
 					}else
 					{
-						if( p_vmn->inode->i_crefs <= base->i_crefs && p_vmn->inode->i_crefs > base->i_peer->i_crefs )
+						if( p_vmn->inode->i_crefs <= base->i_crefs && 
+							  p_vmn->inode->i_crefs > base->i_peer->i_crefs )
 						{
 							 base->i_peer->i_child = p_vmn->inode;
 							 p_vmn->inode->i_child = base;
@@ -63,10 +62,13 @@ static int system_insert(inode_vmn * p_vmn)
 	}
 	else
 	{
-		p_vmn_link_header = p_vmn;
+		 p_vmn_link_header = p_vmn;
 	}
-	return 0;
+	/* return OK */
+	return FS_OK;
 }
+/* allocate supple or not */
+#if ALLOCATE_EXAPP_SUPPLY /* Whether Extended Applications are Supported */	
 /* search inode */
 static inode_vmn * inode_search(unsigned int base , unsigned int size , unsigned int *base_offset)
 {
@@ -118,8 +120,10 @@ static inode_vmn * inode_search(unsigned int base , unsigned int size , unsigned
 		return NULL;
 		/*--------------*/	
 }
+#endif
 static inode_vmn * inode_start(int seq)
 {
+#if ALLOCATE_EXAPP_SUPPLY  /* Whether Extended Applications are Supported */
 	const unsigned int base[][2] = 
   {
 		{ALLOCATE_RAM_ROM_START_ADDR,ALLOCATE_RAM_ROM_SIZE},
@@ -129,6 +133,7 @@ static inode_vmn * inode_start(int seq)
 		{0x490000,20*1024},
 #endif		
 	};
+#endif	
 	/*-------------------*/
 	if( seq == 0 )
 	{
@@ -148,6 +153,7 @@ static inode_vmn * inode_start(int seq)
   }
 	else if( seq >= 1 )
 	{   
+#if ALLOCATE_EXAPP_SUPPLY	/* Whether Extended Applications are Supported */
 		  /* initial some tasks */
 		  static unsigned int cnt = 0;
 		  static unsigned char step = 0;
@@ -170,6 +176,9 @@ static inode_vmn * inode_start(int seq)
 			}				
 		  /* return p */
 			return p;
+#else
+     return NULL;
+#endif
 	}
 	else
 	{
@@ -188,9 +197,9 @@ static int config_inode(void)
 	else
 	{
 		 /* everyone are NULL ,return */
-		return FS_ERR;
+		 return FS_ERR;
 	}
-    /* peer */
+  /* peer */
 	for(p_start = p_inode;p_start != (void*)0;p_start = p_start->i_peer)
 	{
 		if(p_start->config != NULL)
@@ -218,6 +227,7 @@ static int heap_init_inode(void)
     * nothing
     *
     * */
+	struct shell_cmd * shell_i = 0,* shell_t;	
 	/* is ? */
 	if(p_vmn_link_header != NULL)
 	{
@@ -295,26 +305,30 @@ static int heap_init_inode(void)
 						/*------------------------*/					 
 				 }
 			}		
+			/* get the higher and insert the shell node */
+			if( p_start->shell_i != NULL && 
+				((((unsigned int)p_start->shell_i)>>20) == 0x200) &&
+			    p_start->shell_i != shell_i )
+			{
+				 /* last quese */
+				 shell_i = p_start->shell_i;
+				 /* init the inet */
+		     shell_t = shell_i;
+				 /* idle this data */
+				 for( int i = 0 ; i < p_start->max.shell_max ; i ++ )			
+         {				
+				    system_shell_insert(&p_shell_link_base,shell_t);
+					  /* next */
+					  shell_t ++;
+				 }
+			}
 		}		 
 	}
-	/* get the higher and insert the shell node */
-	struct shell_cmd * shell_i = 0;
-	/* int inode */
-  for(p_start = p_inode;p_start != (void*)0;p_start = p_start->i_peer)
-  {	
-		 if( p_start->shell_i != 0 && ((((unsigned int)p_start->shell_i)>>20) == 0x204) && p_start->shell_i != shell_i )
-		 {
-			 shell_i = p_start->shell_i;
-			 /* init */
-			 if( system_runtime != 0 )
-			 {
-				 fs_ioctl(&system_runtime->inode->flip,0,p_start->max.shell_max,shell_i);
-			 }
-		 }
-  }
   /*----------*/
   return FS_OK;
 }
+/* Early initialization of important components */
+#if EXAPP_PREVIOUS_SUPPLY  /* Initialization of necessary components */
 /* previous open */
 static int fs_previous_open(inode_vmn * pfo)
 {
@@ -330,21 +344,25 @@ static int fs_previous_open(inode_vmn * pfo)
 	/* return */
 	return FS_OK;
 }
-/*0---------------------------------------*/
+#endif
+/*---------------------------------------*/
 int fs_system_initialization(void)
 {
+	/* default */
   int i,inode_max = 0,seq = 0;	
+	/* default */
   inode_vmn * base = NULL;
 	/* infint loop */
 	while(1)
 	{
-		/* get the base address */
+		 /* get the base address */
 		 base = inode_start(seq);
-		/* is NULL */ 
+		 /* is NULL */ 
 		 if( base != NULL )
 		 {
 			 inode_max = base->inode->max.inode_max;
-		 }else
+		 }
+		 else
 		 {
 			 if(seq)
 			 {
@@ -374,29 +392,25 @@ int fs_system_initialization(void)
 						base->inode->i_crefs = base->seq & 0xff;
 						/* init the node init */
 						base->inode->i_private = base->init;
+            /* Early initialization of important components */
+#if EXAPP_PREVIOUS_SUPPLY  /* Initialization of necessary components */					
 					  /* previous open */
 					  fs_previous_open(base);
+#endif					
 						/* inode insert to base linker */
 						system_insert(base);
 						/*--------------------------------------------------*/
 						printf_d("the device init ok at path:%s\n",base->path);
 						/*----------------------------------*/
 				}
+				/* incremeter */
 				base++;
 		 }
 		 /* next node */
      seq++;
    }
 }
-/* for test */
-void task_run(int task_id)
-{
-	 /* init */
-	 if( system_runtime != 0 )
-	 {
-		 fs_ioctl(&system_runtime->inode->flip,1,task_id,0);
-	 }	
-}
+/* end if file */
 
 
 

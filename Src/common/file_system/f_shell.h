@@ -59,11 +59,13 @@ int shell_read(const char * cmd,void *data,unsigned int size,unsigned int offset
 int shell_write(const char * cmd,void *data,unsigned int size,unsigned int offset);
 int shell_execute(const char * cmd,unsigned int param);
 int system_shell_insert(struct shell_cmd ** p_link,struct shell_cmd * p_shell);
+#if DYNAMIC_FUNCTIONS // these functions are not be uesed under freertos. 
 int shell_create_dynamic( char * id , void * task , unsigned int freq );
 int shell_delete_dynamic( const char * id , unsigned char mode );
 int shell_revert_dynamic( const char * id );
 int shell_enable_dynamic(unsigned char index);
 int shell_disable_dynamic(unsigned char index);
+#endif
 static void * base_found(unsigned int index);
 int system_shell_insert(struct shell_cmd ** p_link,struct shell_cmd * p_shell);
 void shell_stack_init(void);

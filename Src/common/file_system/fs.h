@@ -8,6 +8,10 @@
 #ifndef __FS_H__
 #define __FS_H__
 
+/* file system config */
+#define   ALLOCATE_EXAPP_SUPPLY   0  /* Whether Extended Applications are Supported */
+#define   EXAPP_PREVIOUS_SUPPLY   0  /* Initialization of necessary components */
+#define   EXA_TIMER_TASK_SUPPLY   0  /* Timers' task supply */
 /* system printf default none */
 #define printf_d(...)
 /* callback function typedef */

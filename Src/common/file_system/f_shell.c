@@ -1,4 +1,24 @@
-
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : notify.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.</center></h2>
+  *
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
+  *
+  ******************************************************************************
+	* BEEP TIM3 CHANNEL1 PWM Gerente
+	* LED is TIM4 CH3 and CH4
+  */
+/* USER CODE END Header */
 
 #include "fs.h"
 #include "string.h"
@@ -7,29 +27,32 @@
 static struct shell_cmd dynamic_shell[20];
 static unsigned char position = 0;
 /* static backup back */
-static struct shell_cmd * p_timer_link_base_backup[7] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL};
 static unsigned char task_mark_sermphone = 0;
 static struct shell_cmd *b_base = NULL; 
+#if DYNAMIC_FUNCTIONS // these functions are not be uesed under freertos.
 static struct shell_cmd * p_idle;
-static unsigned char semi_p_idle; 
+static unsigned char semi_p_idle;
+#endif
 /* heap init */
 void shell_stack_init(void)
 {
 	memset(dynamic_shell,0,sizeof(dynamic_shell));
 	memset(&position,0,sizeof(position));
-	memset(&p_timer_link_base_backup,0,sizeof(p_timer_link_base_backup));
 	memset(&task_mark_sermphone,0,sizeof(task_mark_sermphone));
 	memset(&b_base,0,sizeof(b_base));
-	p_idle = 0;
+#if DYNAMIC_FUNCTIONS // these functions are not be uesed under freertos.	
+	p_idle = 0;	
 	semi_p_idle = 0;
+#endif	
 }
 /* static functions */
 struct shell_cmd * shell_find(const char * shell_cmd)
 {
+	/* fine defaults */
 	struct shell_cmd * p_shell,*p_start;;
 	/* get shell start */
 	p_shell = shell_node_valid();
-
+  /*-----------------*/
 	if(p_shell == (void*)0)
 	{
 	  /* get nothing */
@@ -38,6 +61,7 @@ struct shell_cmd * shell_find(const char * shell_cmd)
 	/* search all node */
 	for(p_start = p_shell ; p_start != (void*)0 ; p_start = p_start->i_peer)
 	{ 
+		/* comp */
 		if( strcmp(shell_cmd,p_start->cmd) == 0)
 		{
 			/* good ! we found it */
@@ -53,6 +77,7 @@ struct shell_cmd * shell_find(const char * shell_cmd)
 			return p_start;
 		}
 	}
+	/* return */
 	return (void*)0;
 }
 struct shell_cmd * dynamic_find(const char * shell_cmd , unsigned char * index)
@@ -94,6 +119,7 @@ struct shell_cmd * dynamic_find(const char * shell_cmd , unsigned char * index)
 			}
 		}
   }
+	/* return fall */
 	return (void*)0;
 }
 
@@ -154,6 +180,7 @@ int shell_execute(const char * cmd,unsigned int param)
 
 	return p_t;
 }
+#if DYNAMIC_FUNCTIONS // these functions are not be uesed under freertos. 
 /*
   Reuse the idle resources in the system
 */
@@ -295,7 +322,7 @@ int shell_create_dynamic( char * id , void * task , unsigned int freq )
 	ret = system_shell_insert(base,p_shell);
   /* return */
 	return ret;
-}
+} 
 /* delete a task */
 int shell_delete_dynamic( const char * id , unsigned char mode )
 {
@@ -399,6 +426,7 @@ int shell_enable_dynamic(unsigned char index)
   /* return */
   return FS_OK;	
 }
+#endif
 /* time base found */
 static void * base_found(unsigned int index)
 {
@@ -439,7 +467,7 @@ int system_shell_insert(struct shell_cmd ** p_link,struct shell_cmd * p_shell)
 	}
 	return FS_OK;
 }
-
+/* end of file */
 
 
 
