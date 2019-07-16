@@ -43,6 +43,7 @@ static unsigned short cali_ctrl;
 static unsigned int imu_freq;
 
 static float bias[3];
+static float acc_bias[3];
 
 static float detlt[3];
 static lpf2pData accLpf[3];
@@ -65,6 +66,10 @@ void mpu5290_task(void * p)
 			bias[1] += mpu9250_s.gyro[1] / 1000.f;
 			bias[2] += mpu9250_s.gyro[2] / 1000.f;
 			
+			acc_bias[0] += mpu9250_s.accel[0] / 1000.f;
+			acc_bias[1] += mpu9250_s.accel[1] / 1000.f;
+			acc_bias[2] += (mpu9250_s.accel[2] - 1) / 1000.f;
+			
 			cali_ctrl++;
 		}
 		else
@@ -72,6 +77,9 @@ void mpu5290_task(void * p)
 		   mpu9250_s.gyro[0] -= bias[0];
 			 mpu9250_s.gyro[1] -= bias[1];
 			 mpu9250_s.gyro[2] -= bias[2];
+			 mpu9250_s.accel[0] -= acc_bias[0];
+			 mpu9250_s.accel[1] -= acc_bias[1];
+			 mpu9250_s.accel[2] -= acc_bias[2];
 
 //			 mpu9250_s.gyro[0] = lpf2pApply(&gyroLpf[0], mpu9250_s.gyro[0] );
 //			 mpu9250_s.gyro[1] = lpf2pApply(&gyroLpf[1], mpu9250_s.gyro[1] );
