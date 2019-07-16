@@ -28,89 +28,105 @@
 #include "filter.h"
 #include "imu.h"
 /* Private includes ----------------------------------------------------------*/
-void IMUupdate( MPU9250_INS_DEF * ins , ATTITUDE_DEF * att);
+static unsigned int mpu9250_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen);
+static struct file * mpu9250_fopen (FAR struct file *filp);
+static int mpu9250_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pri_data);
 /* USER CODE BEGIN Includes */
 FS_INODE_REGISTER("mpu9250.d",mpu,mpu9250_heap_init,0);
-
+/* USER SPI HANDLER */
 extern SPI_HandleTypeDef hspi3;
+/* USER SPI HANDLER */
 SPI_HandleTypeDef * mpu_spi_handle;
-MPU9250_INS_DEF mpu9250_s;
-
-ATTITUDE_DEF attitude;
-
-static unsigned short cali_ctrl;
-
-static unsigned int imu_freq;
-
-static float bias[3];
-static float acc_bias[3];
-
-static float detlt[3];
+/* LPF */
+#if USED_LPF
 static lpf2pData accLpf[3];
 static lpf2pData gyroLpf[3];
-
-void mpu5290_task(void * p)
+#endif
+/* defined functions */
+static int mpu9250_heap_init(void)
 {
-	
-	unsigned int lastWakeTime;
-	
-	while(1)
-	{
-		vTaskDelayUntil(&lastWakeTime, 1);
-		
-		mpu9250_read_sensor( &mpu9250_s );
-		
-		if( cali_ctrl < 1000 )
-		{
-			bias[0] += mpu9250_s.gyro[0] / 1000.f;
-			bias[1] += mpu9250_s.gyro[1] / 1000.f;
-			bias[2] += mpu9250_s.gyro[2] / 1000.f;
-			
-			acc_bias[0] += mpu9250_s.accel[0] / 1000.f;
-			acc_bias[1] += mpu9250_s.accel[1] / 1000.f;
-			acc_bias[2] += (mpu9250_s.accel[2] - 1) / 1000.f;
-			
-			cali_ctrl++;
-		}
-		else
-		{
-		   mpu9250_s.gyro[0] -= bias[0];
-			 mpu9250_s.gyro[1] -= bias[1];
-			 mpu9250_s.gyro[2] -= bias[2];
-			 mpu9250_s.accel[0] -= acc_bias[0];
-			 mpu9250_s.accel[1] -= acc_bias[1];
-			 mpu9250_s.accel[2] -= acc_bias[2];
-
-//			 mpu9250_s.gyro[0] = lpf2pApply(&gyroLpf[0], mpu9250_s.gyro[0] );
-//			 mpu9250_s.gyro[1] = lpf2pApply(&gyroLpf[1], mpu9250_s.gyro[1] );
-//			 mpu9250_s.gyro[2] = lpf2pApply(&gyroLpf[2], mpu9250_s.gyro[2] );
-			 
-			 detlt[0] += mpu9250_s.gyro[0] / 1000;
-			 detlt[1] += mpu9250_s.gyro[1] / 1000;
-			 detlt[2] += mpu9250_s.gyro[2] / 1000;			
-			
-			 mpu9250_s.gyro[0] *= DEG2RAD;
-			 mpu9250_s.gyro[1] *= DEG2RAD;
-			 mpu9250_s.gyro[2] *= DEG2RAD;
-			
-			 if( ( imu_freq ++ ) % 2 )
-			 {
-			   IMUupdate(&mpu9250_s,&attitude);
-			 }
-		}
-	}
-}
-
-int mpu9250_heap_init(void)
-{
+	/* init as default */
+	mpu.flip.f_inode = &mpu;
+	mpu.flip.f_path = "mpu9250.d";
+	/* file interface  */
+	mpu.ops.read  = mpu9250_fread;
+	mpu.ops.open  = mpu9250_fopen;
+	mpu.ops.ioctl = mpu9250_ioctrl;
+	/* spi handle */
 	mpu_spi_handle = &hspi3;
-	mpu9250_init();
-	
-	xTaskCreate(mpu5290_task, "mpu5290_task", 150, NULL, 5, NULL);
-	
-	return FS_OK;
+	/* return mpu9250 result */
+	return mpu9250_init();
 }
 /* file & driver 's interface */
+static struct file * mpu9250_fopen (FAR struct file *filp)
+{
+	/* return flip data */
+	return &mpu.flip;
+}
+/* data read */
+static unsigned int mpu9250_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen)
+{
+	/* ignore the complier warring */
+	(void)filp;
+	/* read */
+	if( buflen != sizeof(MPU9250_INS_DEF) || buffer == NULL )
+	{
+		/* can not supply this format */
+		return 0;
+	}
+	/* read data */
+	mpu9250_read_sensor(buffer);
+	/* return lens */
+	return buflen;
+}
+/* mpu9250 ioctrl */
+static int mpu9250_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pri_data)
+{
+	/* nothing diffrent */
+	int ret = FS_OK;
+	/* temp */
+	unsigned char * io_tmp;
+	/* select a cmd */
+	switch(cmd)
+	{
+		case 0:
+			/* mpu9250_write_reg */
+		  io_tmp = pri_data;
+		  /* write */
+		  mpu9250_write_reg(io_tmp[0],io_tmp[1]);
+		  /* end of cmd */
+			break;
+		case 1:
+			/* mpu9250_read_reg */
+		  ret = mpu9250_read_reg((unsigned char)arg);
+		  /* end of cmd */
+			break;
+		case 2:
+			/* mpu9250_check_reg */
+		  io_tmp = pri_data;
+		  /* read and check */
+			ret = mpu9250_check_reg(io_tmp[0],io_tmp[1]);
+		  /* end of cmd */
+			break;
+		case 3:
+			/* mpu9250_read_sensor */
+		  if( arg != sizeof(MPU9250_INS_DEF) )
+			{
+				return FS_ERR;//can not supply this format
+			}
+			/* read */
+			mpu9250_read_sensor(pri_data);
+			/* end of cmd */
+		case 4:
+			/* mpu9250_init */
+		  ret = mpu9250_init();
+		  /* end of cmd */
+		default:
+			break;
+	}
+	/* return */
+	return ret;
+}
 /* lowlevel */
 static void mpu9250_delay(unsigned int t)
 {
@@ -243,11 +259,13 @@ static int mpu9250_init(void)
 		mpu9250_delay(0xffff);
 	}
 	/* init  */
-	for ( int i = 0 ; i < 3 ; i++ )// 初始化加速计和陀螺二阶低通滤波
+#if USED_LPF	
+	for ( int i = 0 ; i < 3 ; i++ )
 	{
 		lpf2pInit(&gyroLpf[i], 1000, GYRO_LPF_CUTOFF_FREQ);
 		lpf2pInit(&accLpf[i],  1000, ACCEL_LPF_CUTOFF_FREQ);
 	}
+#endif	
 	/* ok . great */
   return FS_OK;
 }

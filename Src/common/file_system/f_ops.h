@@ -39,9 +39,11 @@ static int fs_read(struct file * filp,char *buffer , unsigned int buflen)
 static int fs_sync(struct file * filp)
 {
 	/* judge */
-	if( filp != 0 && filp->f_inode->ops.sync != 0 )
+	if( filp != 0 && 
+		filp->f_inode->ops.storage_dev != 0 &&
+		filp->f_inode->ops.storage_dev->sync != 0 )
 	{	
-	  return filp->f_inode->ops.sync(filp);
+	  return filp->f_inode->ops.storage_dev->sync(filp);
 	}
 	else
 	{
@@ -52,9 +54,11 @@ static int fs_sync(struct file * filp)
 static int fs_close(struct file * filp)
 {
 	/* judge */
-	if( filp != 0 && filp->f_inode->ops.close != 0 )
+	if( filp != 0 &&
+		filp->f_inode->ops.storage_dev != 0 &&
+	  filp->f_inode->ops.storage_dev->close != 0 )
 	{	
-	  return filp->f_inode->ops.close(filp);
+	  return filp->f_inode->ops.storage_dev->close(filp);
 	}
 	else
 	{
@@ -65,9 +69,11 @@ static int fs_close(struct file * filp)
 static int fs_opendir( struct file * filp , const char *path )     
 {
 	/* judge */
-	if( filp != 0 && filp->f_inode->ops.opendir != 0 )
+	if( filp != 0 && 
+		filp->f_inode->ops.storage_dev != 0 &&
+		filp->f_inode->ops.storage_dev->opendir != 0 )
 	{		
-	  return filp->f_inode->ops.opendir(path);
+	  return filp->f_inode->ops.storage_dev->opendir(path);
 	}
 	else
 	{
@@ -78,9 +84,11 @@ static int fs_opendir( struct file * filp , const char *path )
 static int fs_seek(struct file *filp, unsigned int offset, unsigned int whence)
 {
 	/* judge */
-	if( filp != 0 && filp->f_inode->ops.lseek != 0 )
+	if( filp != 0 && 
+		filp->f_inode->ops.storage_dev != 0 &&
+		filp->f_inode->ops.storage_dev->lseek != 0 )
 	{		
-	  return filp->f_inode->ops.lseek(filp,offset,whence);
+	  return filp->f_inode->ops.storage_dev->lseek(filp,offset,whence);
 	}
 	else
 	{
@@ -104,9 +112,11 @@ static int fs_ioctl(struct file *filp, int cmd, unsigned long arg,void *pri_data
 static int fs_readdir( FAR struct file *filp, const char *path,readdir_entrance_def * buffer )     
 {
 	/* judge */
-	if( filp != 0 && filp->f_inode->ops.readir != 0 )
+	if( filp != 0 && 
+		filp->f_inode->ops.storage_dev != 0 &&
+		filp->f_inode->ops.storage_dev->readir != 0 )
 	{		
-	  return filp->f_inode->ops.readir(filp,path,buffer);
+	  return filp->f_inode->ops.storage_dev->readir(filp,path,buffer);
 	}
 	else
 	{

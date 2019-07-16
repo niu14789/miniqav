@@ -174,6 +174,10 @@ typedef struct{
 static int mpu9250_init(void);
 int mpu9250_heap_init(void);
 static void mpu9250_read_sensor( MPU9250_INS_DEF * ins );
+static unsigned char mpu9250_read_reg(unsigned char reg);
+static void mpu9250_write_reg(unsigned char reg,unsigned char data);
+static int mpu9250_check_reg(unsigned char reg,unsigned char data);
+static int mpu9250_init(void);
 /*---------------*/
 #endif
 
