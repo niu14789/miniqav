@@ -21,50 +21,103 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "dev.h"
 #include "fs.h"
 #include "f_shell.h"
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
+#include "main.h"
 #include "mpu9250.h"
+#include "filter.h"
+#include "imu.h"
+/* Private includes ----------------------------------------------------------*/
+void IMUupdate( MPU9250_INS_DEF * ins , ATTITUDE_DEF * att);
+/* USER CODE BEGIN Includes */
+FS_INODE_REGISTER("mpu9250.d",mpu,mpu9250_heap_init,0);
 
-const float gyro_sensitivity  = 1 / 32.8f / 180.0f * 3.1415926f;
-const float accel_sensitivity = 1 / 4096.0f * 9.788f;
+extern SPI_HandleTypeDef hspi3;
+SPI_HandleTypeDef * mpu_spi_handle;
+MPU9250_INS_DEF mpu9250_s;
 
-unsigned char test[5];
+ATTITUDE_DEF attitude;
 
-int ocm_heap_init(void);
+static unsigned short cali_ctrl;
 
-FS_INODE_REGISTER("/ocm.d",ocm0,ocm_heap_init,0);
-FS_INODE_REGISTER("/ocm.d",ocm1,ocm_heap_init,4);
-FS_INODE_REGISTER("/ocm.d",ocm2,ocm_heap_init,3);
-FS_INODE_REGISTER("/ocm.d",ocm3,ocm_heap_init,1);
-FS_INODE_REGISTER("/ocm.d",ocm4,ocm_heap_init,2);
+static unsigned int imu_freq;
 
-FS_SHELL_STATIC(test1,test,0x010001,_CB_RT_);
-FS_SHELL_STATIC(test2,test,0x010001,_CB_RT_);
-FS_SHELL_STATIC(test3,test,0x010001,_CB_RT_);
-FS_SHELL_STATIC(test4,test,0x010001,_CB_RT_);
-FS_SHELL_STATIC(test5,test,0x010001,_CB_RT_);
+static float bias[3];
 
-int ocm_heap_init(void)
+static float detlt[3];
+static lpf2pData accLpf[3];
+static lpf2pData gyroLpf[3];
+
+void mpu5290_task(void * p)
 {
-	return FS_OK;
+	
+	unsigned int lastWakeTime;
+	
+	while(1)
+	{
+		vTaskDelayUntil(&lastWakeTime, 1);
+		
+		mpu9250_read_sensor( &mpu9250_s );
+		
+		if( cali_ctrl < 1000 )
+		{
+			bias[0] += mpu9250_s.gyro[0] / 1000.f;
+			bias[1] += mpu9250_s.gyro[1] / 1000.f;
+			bias[2] += mpu9250_s.gyro[2] / 1000.f;
+			
+			cali_ctrl++;
+		}
+		else
+		{
+		   mpu9250_s.gyro[0] -= bias[0];
+			 mpu9250_s.gyro[1] -= bias[1];
+			 mpu9250_s.gyro[2] -= bias[2];
+
+//			 mpu9250_s.gyro[0] = lpf2pApply(&gyroLpf[0], mpu9250_s.gyro[0] );
+//			 mpu9250_s.gyro[1] = lpf2pApply(&gyroLpf[1], mpu9250_s.gyro[1] );
+//			 mpu9250_s.gyro[2] = lpf2pApply(&gyroLpf[2], mpu9250_s.gyro[2] );
+			 
+			 detlt[0] += mpu9250_s.gyro[0] / 1000;
+			 detlt[1] += mpu9250_s.gyro[1] / 1000;
+			 detlt[2] += mpu9250_s.gyro[2] / 1000;			
+			
+			 mpu9250_s.gyro[0] *= DEG2RAD;
+			 mpu9250_s.gyro[1] *= DEG2RAD;
+			 mpu9250_s.gyro[2] *= DEG2RAD;
+			
+			 if( ( imu_freq ++ ) % 2 )
+			 {
+			   IMUupdate(&mpu9250_s,&attitude);
+			 }
+		}
+	}
 }
 
-/* USER CODE END Includes */
-SPI_HandleTypeDef * mpu_spi_handle;
-/* USER CODE BEGIN */
+int mpu9250_heap_init(void)
+{
+	mpu_spi_handle = &hspi3;
+	mpu9250_init();
+	
+	xTaskCreate(mpu5290_task, "mpu5290_task", 150, NULL, 5, NULL);
+	
+	return FS_OK;
+}
+/* file & driver 's interface */
 /* lowlevel */
-void mpu9250_write_reg(unsigned char reg,unsigned char data)
+static void mpu9250_delay(unsigned int t)
+{
+	while(t--);
+}
+/* mpu9250_write_reg */
+static void mpu9250_write_reg(unsigned char reg,unsigned char data)
 {
 	unsigned char d[2] = { reg , data };
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 	HAL_SPI_Transmit(mpu_spi_handle,d,2,0xffff);
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 }
-/* get */
-unsigned char mpu9250_read_reg(unsigned char reg)
+/* mpu9250_read_reg */
+static unsigned char mpu9250_read_reg(unsigned char reg)
 {
 	unsigned char d = reg | 0x80;
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
@@ -76,94 +129,152 @@ unsigned char mpu9250_read_reg(unsigned char reg)
 	/* return */
 	return d;
 }
-unsigned char mpu_chip_id[3];
-
-int mpu9250_Init( void * dev )
+/* write and check regs */
+static int mpu9250_check_reg(unsigned char reg,unsigned char data)
 {
-	mpu_spi_handle = dev;
-	
-	mpu9250_write_reg(PWR_MGMT_1, 0x00);
-	
-	mpu_chip_id[0] = mpu9250_read_reg(0);
-	
-  mpu9250_write_reg(PWR_MGMT_1, 0x00);	//解除休眠状态
-	mpu9250_write_reg(CONFIG, 0x07);      //低通滤波频率，典型值：0x07(3600Hz)此寄存器内决定Internal_Sample_Rate==8K
-	
-/**********************Init SLV0 i2c**********************************/	
-//Use SPI-bus read slave0
-	mpu9250_write_reg(INT_PIN_CFG ,0x30);// INT Pin / Bypass Enable Configuration  
-	mpu9250_write_reg(I2C_MST_CTRL,0x4d);//I2C MAster mode and Speed 400 kHz
-	mpu9250_write_reg(USER_CTRL ,0x20); // I2C_MST _EN 
-	mpu9250_write_reg(I2C_MST_DELAY_CTRL ,0x01);//延时使能I2C_SLV0 _DLY_ enable 	
-	mpu9250_write_reg(I2C_SLV0_CTRL ,0x81); //enable IIC	and EXT_SENS_DATA==1 Byte
-	
-/*******************Init GYRO and ACCEL******************************/	
-	mpu9250_write_reg(SMPLRT_DIV, 0x07);  //陀螺仪采样率，典型值：0x07(1kHz) (SAMPLE_RATE= Internal_Sample_Rate / (1 + SMPLRT_DIV) )
-	mpu9250_write_reg(GYRO_CONFIG, (2<<3) | 0); //陀螺仪自检及测量范围，典型值：0x18(不自检，2000deg/s)
-	mpu9250_write_reg(ACCEL_CONFIG, 2<<3);//加速计自检、测量范围及高通滤波频率，典型值：0x18(不自检，16G)
-	mpu9250_write_reg(ACCEL_CONFIG_2, 2 | (0<<3));//加速计高通滤波频率 典型值 ：0x08  （1.13kHz）	
- 
-  mpu_chip_id[0] = mpu9250_read_reg(ACCEL_XOUT_L); 
-  mpu_chip_id[1] = mpu9250_read_reg(ACCEL_XOUT_H);
-
-	mpu_chip_id[2] = mpu9250_read_reg(0); 
-	
-	return 0;
+	/* default */
+	unsigned char tmp_reg;
+	/* default try times */
+	unsigned char timeout = 0x10;
+	/* write and check */
+	do
+	{
+		/* write */
+		mpu9250_write_reg( reg , data );
+		/* delay for a while */
+    mpu9250_delay(0xffff);
+		/* read */
+		tmp_reg = mpu9250_read_reg(reg);
+		/* delay for a while */
+		mpu9250_delay(0xffff);
+	}
+	while( tmp_reg != data && timeout-- );//check
+  /* check ok or not */
+	if( timeout == 0xFF )
+	{
+		return FS_ERR; // timeout , oh no.we were failed
+	}
+  /* ok . great */
+	return FS_OK;
 }
-
-
-float gyro[3];
-float acce[3];
-
-
-
-void READ_MPU9250_ACCEL(float * ax,float *ay,float *az)//
-{ 
-   unsigned char BUF[6];
-	 short Accel[3];
-   BUF[0]=mpu9250_read_reg(ACCEL_XOUT_L); 
-   BUF[1]=mpu9250_read_reg(ACCEL_XOUT_H);
-   Accel[0]=	(BUF[1]<<8)|BUF[0];
-   acce[0] = Accel[0] * accel_sensitivity; 
-   BUF[2]=mpu9250_read_reg(ACCEL_YOUT_L);
-   BUF[3]=mpu9250_read_reg(ACCEL_YOUT_H);
-   Accel[1]=	(BUF[3]<<8)|BUF[2];
-   acce[1] = Accel[1] * accel_sensitivity;
-   BUF[4]=mpu9250_read_reg(ACCEL_ZOUT_L); 
-   BUF[5]=mpu9250_read_reg(ACCEL_ZOUT_H);
-   Accel[2]=  (BUF[5]<<8)|BUF[4];
-   acce[2] = Accel[2] * accel_sensitivity;
-	 /*-------------------*/
-	 *ax = acce[0];
-	 *ay = acce[1];
-	 *az = acce[2];
-	 /*-------------------*/
+/* spi read data */
+static void mpu9250_read_sensor( MPU9250_INS_DEF * ins )
+{
+	/* write reg first */
+  unsigned char d = MPU_ACCEL_XOUT_H | 0x80;
+	unsigned char buffer[14];
+	/* chipselect */
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+	/* write reg */
+	HAL_SPI_Transmit(mpu_spi_handle,&d,1,0xffff);
+	/* read */
+	HAL_SPI_Receive(mpu_spi_handle,buffer,sizeof(buffer),0xffff);
+	/* get */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);	
+  /* change */
+  ins->accel[0] = (short)((buffer[0] << 8) + buffer[1]) * ACCEL_SENSITIVITY;	
+	ins->accel[1] = (short)((buffer[2] << 8) + buffer[3]) * ACCEL_SENSITIVITY;
+	ins->accel[2] = (short)((buffer[4] << 8) + buffer[5]) * ACCEL_SENSITIVITY;
+	/* get gyro */
+	ins->gyro[0] = (short)((buffer[8]   << 8) + buffer[9])  * GYRO_SENSITIVITY;
+	ins->gyro[1] = (short)((buffer[10]  << 8) + buffer[11]) * GYRO_SENSITIVITY;
+	ins->gyro[2] = (short)((buffer[12]  << 8) + buffer[13]) * GYRO_SENSITIVITY;
+	/* get temperature */
+	ins->mpu9250_temperature = (short)((buffer[6] << 8) + buffer[7]) * TEMPERATURE_SENSITIVITY + 25;
+	/* ok */
 }
-/**********************陀螺仪读取*****************************/
-void READ_MPU9250_GYRO(float * gx,float *gy,float *gz)
-{ 
-		unsigned char BUF[6];
-		short Gyro[3];
-		BUF[0]=mpu9250_read_reg(GYRO_XOUT_L); 
-		BUF[1]=mpu9250_read_reg(GYRO_XOUT_H);
-		Gyro[0]=	(BUF[1]<<8)|BUF[0];
-		gyro[0] = Gyro[0] * gyro_sensitivity;
-		BUF[2]=mpu9250_read_reg(GYRO_YOUT_L);
-		BUF[3]=mpu9250_read_reg(GYRO_YOUT_H);
-		Gyro[1]=	(BUF[3]<<8)|BUF[2];
-		gyro[1] = Gyro[1] * gyro_sensitivity;
-		BUF[4]=mpu9250_read_reg(GYRO_ZOUT_L);
-		BUF[5]=mpu9250_read_reg(GYRO_ZOUT_H);
-		Gyro[2]=	(BUF[5]<<8)|BUF[4];
-		gyro[2] = Gyro[2] * gyro_sensitivity;
-	  /*----------------*/
-		*gx = gyro[0];
-	  *gy = gyro[1];
-	  *gz = gyro[2];
-	  /*----------------*/
+#if 0
+/* mpu 9250 get mag */
+static void mpu9250_read_mag( MPU9250_MAG_DEF * mag )
+{
+/* write reg first */
+  unsigned char d = MPU_MAG_XOUT_L | 0x80;
+	unsigned char buffer[6];
+	/* chipselect */
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
+	/* write reg */
+	HAL_SPI_Transmit(mpu_spi_handle,&d,1,0xffff);
+	/* read */
+	HAL_SPI_Receive(mpu_spi_handle,buffer,sizeof(buffer),0xffff);
+	/* get */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);	
+  /* change */	
+	mag->mag[0] = (short)((buffer[0] << 8) + buffer[1]);	
+	mag->mag[1] = (short)((buffer[2] << 8) + buffer[3]);	
+	mag->mag[2] = (short)((buffer[4] << 8) + buffer[5]);	
+	/* return */
+}
+#endif
+/* mpu9250 init */
+static int mpu9250_init(void)
+{
+	/* some default */
+	unsigned char ctrl0 = 0x80;
+	unsigned char ctrl1 = BIT_I2C_IF_DIS;
+	unsigned char ctrl2 = OUT_DATA_RATE;
+	unsigned char ctrl3 = GYRO_BADNWIDTH;
+	unsigned char ctrl4 = (GYRO_SCALE<<3) | ENABLE_GDLPF;
+	unsigned char ctrl5 = ACCEL_SCALE<<3;
+	unsigned char ctrl6 = ACCEL_BADNWIDTH | (ENABLE_ADLPF<<3);
+  /* decode */
+	unsigned char ICM_REG[7] = {MPU_PWR_MGMT_1,MPU_USER_CTRL,MPU_SMPLRT_DIV,MPU_CONFIG,MPU_GYRO_CONFIG,MPU_ACCEL_CONFIG,MPU_ACCEL_CONFIG2};
+	unsigned char CTRL_RE[7] = {0x01,ctrl1,ctrl2,ctrl3,ctrl4,ctrl5,ctrl6};
+	/* reset first */
+	mpu9250_write_reg(MPU_PWR_MGMT_1, ctrl0);
+  /* delay for some time */
+  mpu9250_delay(0xffff0);
+  /* for loop to config */
+	for( int i = 0 ; i < 7 ; i++ )
+	{
+		/* start check */
+		if( mpu9250_check_reg(ICM_REG[i],CTRL_RE[i]) != 0 )
+		{
+       return FS_ERR; //failed
+		}
+		/* delay for some time */
+		mpu9250_delay(0xffff);
+	}
+	/* init  */
+	for ( int i = 0 ; i < 3 ; i++ )// 初始化加速计和陀螺二阶低通滤波
+	{
+		lpf2pInit(&gyroLpf[i], 1000, GYRO_LPF_CUTOFF_FREQ);
+		lpf2pInit(&accLpf[i],  1000, ACCEL_LPF_CUTOFF_FREQ);
+	}
+	/* ok . great */
+  return FS_OK;
 }
 
 /* USER CODE END */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

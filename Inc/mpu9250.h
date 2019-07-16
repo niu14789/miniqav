@@ -1,76 +1,195 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : notify.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.</center></h2>
+  *
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
+  *
+  ******************************************************************************
+	* BEEP TIM3 CHANNEL1 PWM Gerente
+	* LED is TIM4 CH3 and CH4
+  */
+/* USER CODE END Header */
 
 #ifndef __MPU5250_H__
 #define __MPU5250_H__
 
+/*
+ * ocm.h
+ *
+ *  Created on: 2017?5?27?
+ *      Author: YJ-User17
+ */
+#define SPIDEV_MPU20608_1    (3)
+#define SPIDEV_MPU20608_2    (2)
+#define SPIDEV_MPU20608_3    (4)
 
-// 定义MPU9250内部地址
-/*****************************************************************/
-#define	SMPLRT_DIV		                      0x19	//陀螺仪采样率
-#define	CONFIG			                        0x1A	
-#define	GYRO_CONFIG		                      0x1B	
-#define	ACCEL_CONFIG	                      0x1C	
-#define	ACCEL_CONFIG_2                      0x1D 
+#define MPU_SELF_TEST_X_GYRO	0x00
+#define MPU_SELF_TEST_Y_GYRO	0x01
+#define MPU_SELF_TEST_Z_GYRO	0x02
+#define MPU_SELF_TEST_X_ACCEL	0x0D
+#define MPU_SELF_TEST_Y_ACCEL	0x0E
+#define MPU_SELF_TEST_Z_ACCEL	0x0F
+#define MPU_XG_OFFS_USRH		0x13
+#define MPU_XG_OFFS_USRL		0x14
+#define MPU_YG_OFFS_USRH		0x15
+#define MPU_YG_OFFS_USRL		0x16
+#define MPU_ZG_OFFS_USRH		0x17
+#define MPU_ZG_OFFS_USRL		0x18
+#define MPU_SMPLRT_DIV			0x19
+#define MPU_CONFIG				  0x1A
+#define MPU_GYRO_CONFIG			0x1B
+#define MPU_ACCEL_CONFIG		0x1C
+#define MPU_ACCEL_CONFIG2		0x1D
+#define MPU_LP_MODE_CFG			0x1E
+#define MPU_ACCEL_WOM_THR		0x1F
+#define MPU_FIFO_EN				  0x23
+#define MPU_FSYNC_INT			  0x36
+#define MPU_INT_PIN_CFG			0x37
+#define MPU_INT_ENABLE			0x38
+#define MPU_INT_STATUS			0x3A
+#define MPU_ACCEL_XOUT_H		0x3B
+#define MPU_ACCEL_XOUT_L		0x3C
+#define MPU_ACCEL_YOUT_H		0x3D
+#define MPU_ACCEL_YOUT_L		0x3E
+#define MPU_ACCEL_ZOUT_H		0x3F
+#define MPU_ACCEL_ZOUT_L		0x40
+#define MPU_TEMP_OUT_H			0x41
+#define MPU_TEMP_OUT_L			0x42
+#define MPU_GYRO_XOUT_H			0x43
+#define MPU_GYRO_XOUT_L			0x44
+#define MPU_GYRO_YOUT_H			0x45
+#define MPU_GYRO_YOUT_L			0x46
+#define MPU_GYRO_ZOUT_H			0x47
+#define MPU_GYRO_ZOUT_L			0x48
+#define MPU_SIGNAL_PATH_RESET	0x68
+#define MPU_ACCEL_INTEL_CTRL	0x69
+#define MPU_USER_CTRL			  0x6A
+#define MPU_PWR_MGMT_1			0x6B
+#define MPU_PWR_MGMT_2			0x6C
+#define MPU_FIFO_COUNTH			0x72
+#define MPU_FIFO_COUNTL			0x73
+#define MPU_FIFO_R_W			  0x74
+#define MPU_WHO_AM_I			  0x75
+#define MPU_XA_OFFSET_H			0x77
+#define MPU_XA_OFFSET_L			0x78
+#define MPU_YA_OFFSET_H			0x7A
+#define MPU_YA_OFFSET_L			0x7B
+#define MPU_ZA_OFFSET_H			0x7D
+#define MPU_ZA_OFFSET_L			0x7E
+/* mag */
+#define MPU_MAG_XOUT_L		  0x03
+#define MPU_MAG_XOUT_H		  0x04
+#define MPU_MAG_YOUT_L		  0x05
+#define MPU_MAG_YOUT_H		  0x06
+#define MPU_MAG_ZOUT_L		  0x07
+#define MPU_MAG_ZOUT_H		  0x08
+/* Variables -----------------------------------------------------------------*/
+enum Odr { // gyro Output Data Rate
+  ODR_1kHz = 0,
+  ODR_500Hz,	// default
+  ODR_333Hz,
+  ODR_250Hz,
+  ODR_200Hz,
+  ODR_167Hz,
+  ODR_142Hz,
+  ODR_125Hz,
+  ODR_111Hz		//0x08
+};
 
-#define INT_PIN_CFG                         0x37 //中断配置
-#define USER_CTRL                           0x6a
-#define I2C_MST_CTRL                        0x24
-#define I2C_MST_DELAY_CTRL                  0x67
-//--------------------i2c slv0-------------------------------//
-#define I2C_SLV0_ADDR                       0x25  
-#define I2C_SLV0_REG                        0x26
-#define I2C_SLV0_CTRL                       0x27 
-#define I2C_SLV0_DO                         0x63 //output reg
-//--------------------AK8963 reg addr------------------------//
-#define MPU9250_AK8963_ADDR                 0x0C  //AKM addr
-#define AK8963_WHOAMI_REG                   0x00  //AKM ID addr
-#define AK8963_WHOAMI_ID                    0x48  //ID
-#define AK8963_ST1_REG                      0x02  //Data Status1
-#define AK8963_ST2_REG                      0x09  //Data reading end register & check Magnetic sensor overflow occurred
-#define AK8963_ST1_DOR                      0x02
-#define AK8963_ST1_DRDY                     0x01 //Data Ready
-#define AK8963_ST2_BITM                     0x10
-#define AK8963_ST2_HOFL                     0x08 // Magnetic sensor overflow 
-#define AK8963_CNTL1_REG                    0x0A
-#define AK8963_CNTL2_REG                    0x0B
-#define AK8963_CNTL2_SRST                   0x01 //soft Reset
-#define AK8963_ASAX                         0x10 //X-axis sensitivity adjustment value 
-#define AK8963_ASAY                         0x11 //Y-axis sensitivity adjustment value
-#define AK8963_ASAZ                         0x12 //Z-axis sensitivity adjustment value
-//--------------------9axis  reg addr-----------------------//
-#define	ACCEL_XOUT_H	0x3B
-#define	ACCEL_XOUT_L	0x3C
-#define	ACCEL_YOUT_H	0x3D
-#define	ACCEL_YOUT_L	0x3E
-#define	ACCEL_ZOUT_H	0x3F
-#define	ACCEL_ZOUT_L	0x40
+enum Ascale {
+  AFS_2G = 0,
+  AFS_4G,
+  AFS_8G,
+  AFS_16G
+};
 
-#define	TEMP_OUT_H		0x41   //temperture
-#define	TEMP_OUT_L		0x42
+enum Abw { // accel bandwidth
+  ABW_218_1 = 1,
+  ABW_99_0,
+  ABW_44_8,
+  ABW_21_2,
+  ABW_10_2,
+  ABW_5_1,
+  ABW_420 = 7 //0x07
+};
 
-#define	GYRO_XOUT_H		0x43
-#define	GYRO_XOUT_L		0x44	
-#define	GYRO_YOUT_H		0x45
-#define	GYRO_YOUT_L		0x46
-#define	GYRO_ZOUT_H		0x47
-#define	GYRO_ZOUT_L		0x48
-		
-#define MAG_XOUT_L		0x03
-#define MAG_XOUT_H		0x04
-#define MAG_YOUT_L		0x05
-#define MAG_YOUT_H		0x06
-#define MAG_ZOUT_L		0x07
-#define MAG_ZOUT_H		0x08
-//--------------------other reg addr-----------------------//
-#define	PWR_MGMT_1		0x6B	//电源管理，典型值：0x00(正常启用)
-#define	WHO_AM_I		  0x75	//ID地址寄存器(正确数值0x71，只读)
+enum Gscale {  // gyro full scale
+  GFS_250DPS = 0,
+  GFS_500DPS,
+  GFS_1000DPS,		// default
+  GFS_2000DPS         // 0x03
+};
 
-#define EXT_SENS_DATA_00    0x49  //MPU9250 IIC外挂器件读取返回寄存器00
-#define EXT_SENS_DATA_01    0x4a  //MPU9250 IIC外挂器件读取返回寄存器01
-#define EXT_SENS_DATA_02    0x4b  //MPU9250 IIC外挂器件读取返回寄存器02
-#define EXT_SENS_DATA_03    0x4c  //MPU9250 IIC外挂器件读取返回寄存器03
+enum Gbw { // gyro bandwidth
+  GBW_250Hz = 0,
+  GBW_176Hz,
+  GBW_92Hz,
+  GBW_41Hz,
+  GBW_20Hz,
+  GBW_10Hz,
+  GBW_5Hz,
+  GBW_3281Hz	// 0x07
+};
+/* mpu9250 ins sensor default */
+typedef struct{
+	float accel[3];
+	float gyro[3];
+	float mpu9250_temperature;
+}MPU9250_INS_DEF;
+/* mpu9250 mag def */
+typedef struct{
+	float mag[3];
+}MPU9250_MAG_DEF;
+/*----------------------------*/
+#define BIT_H_RESET					  0x80
+#define BIT_RAW_RDY_EN				0x01
+#define BIT_I2C_IF_DIS				0x10
+#define BIT_RAW_RDY_EN				0x01
+#define BIT_INT_ANYRD_2CLEAR	0x10
 
-
+#define OUT_DATA_RATE				  ODR_1kHz
+#define ACCEL_SCALE					  AFS_8G
+#define ACCEL_BADNWIDTH				ABW_44_8
+#define GYRO_SCALE					  GFS_1000DPS
+#define GYRO_BADNWIDTH				GBW_92Hz
+#define ENABLE_ADLPF				  0
+#define ENABLE_GDLPF				  0
+#define DISABLE_ADLPF				  1
+#define DISABLE_GDLPF				  3
+/* sensitivity */
+#define GYRO_SENSITIVITY               ((float)( 2000.f / 65536.f ))
+#define ACCEL_SENSITIVITY              ((float)( 16.f / 65536.f   ))
+#define TEMPERATURE_SENSITIVITY        ((float)( 1 / 326.8f    ))
+/* some decleare */
+static int mpu9250_init(void);
+int mpu9250_heap_init(void);
+static void mpu9250_read_sensor( MPU9250_INS_DEF * ins );
+/*---------------*/
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
