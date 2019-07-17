@@ -26,7 +26,7 @@
 #include "main.h"
 #include "mpu9250.h"
 #include "filter.h"
-#include "imu.h"
+#include "state.h"
 /* Private includes ----------------------------------------------------------*/
 static unsigned int mpu9250_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen);
 static struct file * mpu9250_fopen (FAR struct file *filp);
@@ -201,9 +201,9 @@ static void mpu9250_read_sensor( MPU9250_INS_DEF * ins )
 	ins->accel[1] = (short)((buffer[2] << 8) + buffer[3]) * ACCEL_SENSITIVITY;
 	ins->accel[2] = (short)((buffer[4] << 8) + buffer[5]) * ACCEL_SENSITIVITY;
 	/* get gyro */
-	ins->gyro[0] = (short)((buffer[8]   << 8) + buffer[9])  * GYRO_SENSITIVITY;
-	ins->gyro[1] = (short)((buffer[10]  << 8) + buffer[11]) * GYRO_SENSITIVITY;
-	ins->gyro[2] = (short)((buffer[12]  << 8) + buffer[13]) * GYRO_SENSITIVITY;
+	ins->gyro[0] = (short)((buffer[8]   << 8) + buffer[9])  * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
+	ins->gyro[1] = (short)((buffer[10]  << 8) + buffer[11]) * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
+	ins->gyro[2] = (short)((buffer[12]  << 8) + buffer[13]) * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
 	/* get temperature */
 	ins->mpu9250_temperature = (short)((buffer[6] << 8) + buffer[7]) * TEMPERATURE_SENSITIVITY + 25;
 	/* ok */

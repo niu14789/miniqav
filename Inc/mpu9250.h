@@ -23,6 +23,8 @@
 #ifndef __MPU5250_H__
 #define __MPU5250_H__
 
+#include "state.h"
+
 #define MPU_SELF_TEST_X_GYRO	0x00
 #define MPU_SELF_TEST_Y_GYRO	0x01
 #define MPU_SELF_TEST_Z_GYRO	0x02
@@ -130,16 +132,6 @@ enum Gbw { // gyro bandwidth
   GBW_5Hz,
   GBW_3281Hz	// 0x07
 };
-/* mpu9250 ins sensor default */
-typedef struct{
-	float accel[3];
-	float gyro[3];
-	float mpu9250_temperature;
-}MPU9250_INS_DEF;
-/* mpu9250 mag def */
-typedef struct{
-	float mag[3];
-}MPU9250_MAG_DEF;
 /*----------------------------*/
 #define BIT_H_RESET					  0x80
 #define BIT_RAW_RDY_EN				0x01
