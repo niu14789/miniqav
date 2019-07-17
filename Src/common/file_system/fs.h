@@ -139,7 +139,7 @@ __attribute__((unused, section("fs_shell")));                                   
  	 __FS_SHELL_##sh.enter = (void *)&entrance;                                      \
 }                                                                                  \
 
-#define FS_SHELL_STATIC(sh,entrance,size_t,cb_type)                                \
+#define FS_SHELL_STATIC(sh,entrance,size_t)                                \
 struct shell_cmd __FS_SHELL_##sh                                                   \
 __attribute__((unused, section("fs_shell"))) =                                     \
 {                                                                                  \
@@ -147,7 +147,6 @@ __attribute__((unused, section("fs_shell"))) =                                  
 	(void *)0,                                                                       \
   #entrance,                                                                       \
 	size_t,                                                                          \
-	cb_type,                                                                         \
  	(void *)&entrance                                                                \
 }                                                                                  \
 
@@ -230,8 +229,7 @@ struct shell_cmd
 	struct shell_cmd *i_peer;
 	struct shell_cmd *i_child;
 	char   *cmd;
-	int    size;/* function or param or others and param numbers and returns or not */
-	int    it_type;
+	int    size_type;/* function or param or others and param numbers and returns or not */
 	void  *enter;
 };
 

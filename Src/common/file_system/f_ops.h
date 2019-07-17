@@ -10,7 +10,7 @@
 /* ips */
 #include "fs.h"
 /* fs write */
-static int fs_write(struct file * filp,const char * buffer , unsigned int buflen)  
+static int fs_write(struct file * filp,const void * buffer , unsigned int buflen)  
 { 
 	/* judge */
 	if( filp != 0 && filp->f_inode->ops.write != 0 )
@@ -23,7 +23,7 @@ static int fs_write(struct file * filp,const char * buffer , unsigned int buflen
 	}
 }
 /* fs read */
-static int fs_read(struct file * filp,char *buffer , unsigned int buflen)   
+static int fs_read(struct file * filp,void *buffer , unsigned int buflen)   
 {
 	/* judge */
 	if( filp != 0 && filp->f_inode->ops.read != 0 )

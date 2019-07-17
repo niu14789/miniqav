@@ -470,6 +470,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>Application/Flight</GroupName>
+          <Files>
+            <File>
+              <FileName>stab.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\stab.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Drivers/Sensor</GroupName>
           <Files>
             <File>
