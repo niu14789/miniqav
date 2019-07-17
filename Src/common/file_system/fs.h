@@ -172,10 +172,12 @@ struct file
 {
   int               f_oflags; /* Open mode flags */ 
   FAR struct inode *f_inode;  /* Driver interface */
-  void             *f_priv;   /* Per file driver private data */
+#if 0	
+  void             *f_priv;   /* Per file driver private data */	
   char             *f_path;   /* file path */
 	int               f_dev;    /* storage device identify */
   int               f_multi;  /* open multiple files */
+#endif	
 #if 0
 	int               f_res;    /* result */
 #endif
@@ -269,7 +271,6 @@ struct inode
 };
 
 extern int fs_system_initialization(void);
-extern callback_function isr[64];
 extern FAR inode_vmn *inode_sched_getfiles(void);
 extern const inode_vmn __FS_START__;
 extern FAR inode_vmn * inode_find(inode_vmn *inode,FAR const char *path);
@@ -282,6 +283,7 @@ FAR struct shell_cmd * shell_node_valid(void);
 FAR inode_vmn *inode_valid(void);
 FAR struct callback_t *cb_sched_getfiles(void);
 extern struct file * open(const char *path, int oflags);
+
 #endif /* FS_FS_H_ */
 
 

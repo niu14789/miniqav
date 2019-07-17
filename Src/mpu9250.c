@@ -39,15 +39,16 @@ extern SPI_HandleTypeDef hspi3;
 SPI_HandleTypeDef * mpu_spi_handle;
 /* LPF */
 #if USED_LPF
+/* define */
 static lpf2pData accLpf[3];
 static lpf2pData gyroLpf[3];
+/* end */
 #endif
 /* defined functions */
 static int mpu9250_heap_init(void)
 {
 	/* init as default */
 	mpu.flip.f_inode = &mpu;
-	mpu.flip.f_path = "mpu9250.d";
 	/* file interface  */
 	mpu.ops.read  = mpu9250_fread;
 	mpu.ops.open  = mpu9250_fopen;
@@ -206,8 +207,17 @@ static void mpu9250_read_sensor( MPU9250_INS_DEF * ins )
 	/* get temperature */
 	ins->mpu9250_temperature = (short)((buffer[6] << 8) + buffer[7]) * TEMPERATURE_SENSITIVITY + 25;
 	/* ok */
+#if USED_LPF
+  for( int i = 0 ; i < 3 ; i ++ ) 
+	{
+		/* apply lpf2 */
+    ins->accel[i] = lpf2pApply(&accLpf[i],ins->accel[i]);
+	  ins->gyro[i]  = lpf2pApply(&gyroLpf[i] , ins->gyro[i]);
+	}
+#endif
 }
-#if 0
+/* disable mag sensor */
+#if USED_MAG
 /* mpu 9250 get mag */
 static void mpu9250_read_mag( MPU9250_MAG_DEF * mag )
 {
@@ -241,7 +251,9 @@ static int mpu9250_init(void)
 	unsigned char ctrl5 = ACCEL_SCALE<<3;
 	unsigned char ctrl6 = ACCEL_BADNWIDTH | (ENABLE_ADLPF<<3);
   /* decode */
-	unsigned char ICM_REG[7] = {MPU_PWR_MGMT_1,MPU_USER_CTRL,MPU_SMPLRT_DIV,MPU_CONFIG,MPU_GYRO_CONFIG,MPU_ACCEL_CONFIG,MPU_ACCEL_CONFIG2};
+	unsigned char ICM_REG[7] = {MPU_PWR_MGMT_1,MPU_USER_CTRL,MPU_SMPLRT_DIV,MPU_CONFIG,
+	                            MPU_GYRO_CONFIG,MPU_ACCEL_CONFIG,MPU_ACCEL_CONFIG2};
+	/* reg data that will write into */
 	unsigned char CTRL_RE[7] = {0x01,ctrl1,ctrl2,ctrl3,ctrl4,ctrl5,ctrl6};
 	/* reset first */
 	mpu9250_write_reg(MPU_PWR_MGMT_1, ctrl0);

@@ -82,7 +82,9 @@ struct file * open(const char *path, int oflags)
   {
 		if(_inode_compare(path,p_start->inode_name) == FS_OK)
 		{
+#if 0			
 			filp.f_path = (char *)path;
+#endif			
 			filp.f_oflags = oflags;
 			if(p_start->ops.open != (void*)0)
 			{
@@ -99,7 +101,9 @@ struct file * open(const char *path, int oflags)
   {
 		if(_inode_compare(path,p_start->inode_name) == FS_OK)
 		{
+#if 0			
 			filp.f_path = (char *)path;
+#endif			
 			filp.f_oflags = oflags;
 			if(p_start->ops.open != (void*)0)
 			{

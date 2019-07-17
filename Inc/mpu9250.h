@@ -23,16 +23,6 @@
 #ifndef __MPU5250_H__
 #define __MPU5250_H__
 
-/*
- * ocm.h
- *
- *  Created on: 2017?5?27?
- *      Author: YJ-User17
- */
-#define SPIDEV_MPU20608_1    (3)
-#define SPIDEV_MPU20608_2    (2)
-#define SPIDEV_MPU20608_3    (4)
-
 #define MPU_SELF_TEST_X_GYRO	0x00
 #define MPU_SELF_TEST_Y_GYRO	0x01
 #define MPU_SELF_TEST_Z_GYRO	0x02
@@ -170,7 +160,14 @@ typedef struct{
 #define GYRO_SENSITIVITY               ((float)( 2000.f / 65536.f ))
 #define ACCEL_SENSITIVITY              ((float)( 16.f / 65536.f   ))
 #define TEMPERATURE_SENSITIVITY        ((float)( 1 / 326.8f    ))
+	
+/* config */
+
+#define USED_LPF              0  /* enable / disable LPF ( low pass filter ) */
+#define USED_MAG              0  /* as default . disable the mag sensor */
+
 /* some decleare */
+
 static int mpu9250_init(void);
 int mpu9250_heap_init(void);
 static void mpu9250_read_sensor( MPU9250_INS_DEF * ins );
