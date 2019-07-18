@@ -22,9 +22,12 @@
 
 #ifndef __NRF24L01_H__
 #define __NRF24L01_H__
-
-#include "dev.h"
-
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+#define RECEIVER_BOARD   0   // Independent Receiver Board Enable or not
+/* USER CODE END PM */
+/* USER CODE BEGIN Includes */
+#define SILIENCE_DEBUG         (0)
 /** 配置和选项定义 */
 #define DYNAMIC_PACKET      1 		//1:动态数据包, 0:固定
 #define FIXED_PACKET_LEN    32		//包长度
@@ -33,12 +36,12 @@
 
 /** RF24L01硬件IO定义 */
 #define RF24L01_CE_GPIO_PORT			GPIOB
-#define RF24L01_CE_GPIO_PIN			  GPIO_PIN_10
+#define RF24L01_CE_GPIO_PIN			    GPIO_PIN_10
 
 #define RF24L01_IRQ_GPIO_PORT			GPIOA
 #define RF24L01_IRQ_GPIO_PIN			GPIO_PIN_4
 
-#define RF24L01_CS_GPIO_PORT			GPIOB			//PB1
+#define RF24L01_CS_GPIO_PORT			GPIOB			//PB4
 #define RF24L01_CS_GPIO_PIN				GPIO_PIN_1
 
 /** 口线操作函数定义 */
@@ -198,6 +201,12 @@ typedef enum PowerType
 #define IRQ_ALL  ( (1<<RX_DR) | (1<<TX_DS) | (1<<MAX_RT) )
 
 
+static int nrf_heap_init(void);
+static int nrf24L01_Init( void );
+static int nrf_config(void);
+static void nrf_thread(void *p);
+int nrf_read(unsigned int addr,void * data , unsigned int len);
+int nrf_write(unsigned int addr,const void * data , unsigned int len);
 
 unsigned char NRF24L01_Read_Reg( unsigned char RegAddr );
 void NRF24L01_Read_Buf( unsigned char RegAddr, unsigned char *pBuf, unsigned char len );

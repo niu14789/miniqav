@@ -21,17 +21,122 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "dev.h"
+#include "fs.h"
+#include "f_shell.h"
+#include "state.h"
+#include "main.h"
+#include "cmsis_os.h"
+#include "f_ops.h"
+#include "crc16.h"
+#include "string.h"
 /* Private includes ----------------------------------------------------------*/
+static struct file * nrf_fopen (FAR struct file *filp);
+static int nrf_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pri_data);
+static unsigned int nrf_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen);
+static int nrf_fwrite(FAR struct file *filp, FAR const void * buffer, unsigned int buflen);
 /* USER CODE BEGIN Includes */
-
 #include "nrf24l01.h"
-
 /* USER CODE END Includes */
-
+/* USER CODE BEGIN Includes */
+FS_INODE_REGISTER("nrf.d",nrf,nrf_heap_init,0);
+/* USER SPI HANDLER */
+extern SPI_HandleTypeDef hspi1;
+/* define */
 SPI_HandleTypeDef * rf_spi_handle;
+/* default channel and rx tx data */
 static unsigned char  tr_addr_g[5] = {INIT_ADDR};
 static unsigned char rf_ch_g = 60;
+/*--------------------------------file system--------------------------------*/
+/* defined functions */
+static int nrf_heap_init(void)
+{
+	/* init as default */
+	nrf.flip.f_inode = &nrf;
+	nrf.config = nrf_config;
+	/* file interface  */
+	nrf.ops.read  = nrf_fread;
+	nrf.ops.write = nrf_fwrite;
+	nrf.ops.open  = nrf_fopen;
+	nrf.ops.ioctl = nrf_ioctrl;
+	/* spi handle */
+	rf_spi_handle = &hspi1;
+	/* return mpu9250 result */
+	return nrf24L01_Init();
+}
+/* create a task for receiving the remote */
+static int nrf_config(void)
+{
+	/* create a task run as 1ms per second */
+	xTaskCreate(nrf_thread, "nrf_thread", 128 /* stack size */, 0 , 4 /* priority */ , 0 );
+	/* return OK */
+	return FS_OK;
+}
+
+unsigned char rc_data[32];
+rcs_HandleTypeDef __rc;
+rcs_HandleTypeDef *__rtc;
+/* nrf task */
+static void nrf_thread(void *p)
+{
+	/* Ignore compiler warnings */
+	(void)p;
+	/* init something */	
+	unsigned int lasttime;
+		/* loop */
+	while(1)
+	{
+		 vTaskDelayUntil(&lasttime, 1 /* 10ms */ );
+		 /* read nrf data */
+		 if( nrf_fread(0,rc_data,sizeof(rc_data)) != 0 )
+		 {
+			 __rtc = ( rcs_HandleTypeDef * )rc_data;
+			 /* check crc */
+			 if( fs_crc16_read(__rtc,sizeof(rcs_HandleTypeDef) - 2 ) == __rtc->crc )
+			 {
+					/* copy data */
+					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));				 
+			 }
+			 /*-----------*/
+		 }
+	}
+}
+/* file & driver 's interface */
+static struct file * nrf_fopen (FAR struct file *filp)
+{
+	/* return flip data */
+	return &nrf.flip;
+}
+/* data read */
+static unsigned int nrf_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen)
+{
+	/* read */
+  return nrf_read(0,buffer,buflen);
+}
+/* write nrf data */
+static int nrf_fwrite(FAR struct file *filp, FAR const void * buffer, unsigned int buflen)
+{
+	return nrf_write(0,buffer,buflen);
+}
+/* mpu9250 ioctrl */
+static int nrf_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pri_data)
+{
+	/* nothing diffrent */
+	int ret = FS_OK;
+	/* select a cmd */
+	switch(cmd)
+	{
+		case 0:
+			/* init nrf24l01 */
+		  ret = nrf24L01_Init();
+		  /* end if */
+			break;
+		default:
+			break;
+	}
+	/* return */
+	return ret;
+}
+/*--------------------------------low level----------------------------------*/
 /* delay */
 static void rf_delay_ms(unsigned int t)
 {
@@ -482,7 +587,7 @@ void RF24LL01_Write_Hopping_Point( unsigned char FreqPoint )
 int NRF24L01_check( void )
 {
 	unsigned char i;
-	unsigned char buf[5]={ 0XA5, 0X55, 0X56, 0X57, 0X58 };
+	unsigned char buf[5]={ 0XA5, 0XA5, 0XA5, 0XA5, 0XA5 };
 	unsigned char read_buf[ 5 ] = { 0 };
 	unsigned char try_time = 0;
 	while( 1 )
@@ -606,16 +711,9 @@ unsigned char NRF24L01_RxPacket( unsigned char *rxbuf ,unsigned char *addr)
 	hal_spi_rw_byte( FLUSH_RX );
 	RF24L01_SET_CS_HIGH( );
 	
-	while( 0 != RF24L01_GET_IRQ_STATUS( ))
+	if( RF24L01_GET_IRQ_STATUS( ))
 	{
-//		rf_delay_ms( 100 );
-//		
-//		if( 30 == l_100MsTimes++ )		//3s没接收过数据，重新初始化模块
-//		{
-//			RF24L01_Init(addr );
-//			RF24L01_Set_Mode( MODE_RX );
-//			break;
-//		}
+    return 0;
 	}
 	
 	l_Status = NRF24L01_Read_Reg( STATUS );		//读状态寄存器
@@ -655,24 +753,24 @@ void RF24L01_Init(unsigned char * addr ,unsigned char rf_ch)
 	
 #endif	//DYNAMIC_PACKET
 
-    NRF24L01_Write_Reg( CONFIG, /*( 1<<MASK_RX_DR ) |*/		//?óê??D??
-                                      ( 1 << EN_CRC ) |     //ê1?üCRC 1??×??ú
-                                      ( 1 << PWR_UP ) );    //?a??éè±?
-    NRF24L01_Write_Reg( EN_AA, ( 1 << ENAA_P0 ) );   		//í¨μà0×??ˉó|′e
-    NRF24L01_Write_Reg( EN_RXADDR, ( 1 << ERX_P0 ) );		//í¨μà0?óê?
-    NRF24L01_Write_Reg( SETUP_AW, AW_5BYTES );     			//μ??·?í?è 5??×??ú
+    NRF24L01_Write_Reg( CONFIG, /*( 1<<MASK_RX_DR ) |*/		
+                                      ( 1 << EN_CRC ) |     
+                                      ( 1 << PWR_UP ) );   
+    NRF24L01_Write_Reg( EN_AA, ( 1 << ENAA_P0 ) );   		
+    NRF24L01_Write_Reg( EN_RXADDR, ( 1 << ERX_P0 ) );		
+    NRF24L01_Write_Reg( SETUP_AW, AW_5BYTES );     		
     NRF24L01_Write_Reg( SETUP_RETR, ARD_4000US |
-                        ( REPEAT_CNT & 0x0F ) );         	//???′μè′yê±?? 250us
-    NRF24L01_Write_Reg( RF_CH, rf_ch );             			//3?ê??ˉí¨μà
+                        ( REPEAT_CNT & 0x0F ) ); 
+    NRF24L01_Write_Reg( RF_CH, rf_ch ); 
     NRF24L01_Write_Reg( RF_SETUP, 0x26 );
 
-    NRF24L01_Set_TxAddr( addr, 5 );                      //éè??TXμ??·
-    NRF24L01_Set_RxAddr( 0, addr, 5 );                   //éè??RXμ??·
+    NRF24L01_Set_TxAddr( addr, 5 );
+    NRF24L01_Set_RxAddr( 0, addr, 5 ); 
 		
     NRF24L01_Set_Speed(SPEED_1M);
 }
 /* set package */
-int nrf_write(unsigned int addr,void * data , unsigned int len)
+int nrf_write(unsigned int addr,const void * data , unsigned int len)
 {
 	/* set TX mode */
   RF24L01_Set_Mode( MODE_TX );
@@ -690,6 +788,7 @@ int nrf_read(unsigned int addr,void * data , unsigned int len)
 	/* return */
 	return read_len;
 }
+#if 0
 /* delay for a while , just for notify */
 static void delay_ms_rf(unsigned int ms)
 {
@@ -699,6 +798,7 @@ static void delay_ms_rf(unsigned int ms)
 	/* wait */
 	while( !((HAL_GetTick() - tick) > ms) );
 }
+#endif
 #if 0
 /* process */
 void key_process(unsigned int pm1,unsigned int pm2,unsigned int pm3,unsigned int pm4,unsigned int pm5)
@@ -760,6 +860,7 @@ void key_process(unsigned int pm1,unsigned int pm2,unsigned int pm3,unsigned int
 		}
 }
 #endif
+#if 0
 /* nrf 24l01 ioctrl */
 int nrf_ioctrl(unsigned int cmd,unsigned int param,void * data,unsigned len)
 {
@@ -827,33 +928,23 @@ int nrf_ioctrl(unsigned int cmd,unsigned int param,void * data,unsigned len)
 	/* return ret */
 	return ret;
 }
+#endif
 /* dev init */
-int nrf24L01_Init( dev_HandleTypeDef * dev , void * spi_handle ,unsigned int pm)
+static int nrf24L01_Init( void )
 {
 	  /* transfer interface */
-	  if( spi_handle != 0 && rf_spi_handle == 0 )
+	  if( rf_spi_handle == 0 )
 		{
-			rf_spi_handle = spi_handle;
+			return FS_ERR;//please init spi handle first
 		}
-		/* copy data */
-		dev->write = nrf_write;
-		dev->state = delay_ms_rf;
-		dev->read  = nrf_read;
-		#if 0
-		dev->process = key_process;
-		#endif
-		dev->ioctrl = nrf_ioctrl;
-		/*---------*/
+		/*----- nrf24l01 check ---*/
 		if( NRF24L01_check() != 0 )
 		{
-			return (-1);
+			return FS_ERR;/* check failed */
 		}
 #if 0
 		/* get and check pm */
-		dev_HandleTypeDef * fs = (dev_HandleTypeDef *)pm;
 		unsigned char unique_d[4];
-		/* read from flash */
-		fs->read(FEBASE_ADDR,unique_d,sizeof(unique_d));
 		/* check it out */
 		if( unique_d[2] == 0xAA && unique_d[0] != 0 && unique_d[1] != 0 &&
 			(unsigned char)(unique_d[0]+unique_d[1]) == unique_d[3] )
@@ -866,8 +957,8 @@ int nrf24L01_Init( dev_HandleTypeDef * dev , void * spi_handle ,unsigned int pm)
 			dev->i_pri  = unique_d[0] << 8 | unique_d[1]; 
 			/* set channel */
 			rf_ch_g = ( unique_d[0] + unique_d[1] ) & 0x7f;
-		}				
-#endif
+		}
+#endif		
 		/* init rf */
 		RF24L01_Init(tr_addr_g,rf_ch_g);
 		/* ok */

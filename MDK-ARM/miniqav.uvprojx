@@ -338,7 +338,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F411xE,USE_HAL_DRIVER,STM32F411xE</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc; ../Drivers/STM32F4xx_HAL_Driver/Inc; ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy; ../Middlewares/Third_Party/FatFs/src; ../Middlewares/Third_Party/FreeRTOS/Source/include; ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS; ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F; ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc; ../Middlewares/ST/STM32_USB_Device_Library/Class/MSC/Inc; ../Drivers/CMSIS/Device/ST/STM32F4xx/Include; ../Drivers/CMSIS/Include; ../Src/common/file_system</IncludePath>
+              <IncludePath>../Inc;../Drivers/STM32F4xx_HAL_Driver/Inc;../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FatFs/src;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Middlewares/ST/STM32_USB_Device_Library/Core/Inc;../Middlewares/ST/STM32_USB_Device_Library/Class/MSC/Inc;../Drivers/CMSIS/Device/ST/STM32F4xx/Include;../Drivers/CMSIS/Include;../Src/common/file_system;../Src/common/easylink</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -496,6 +496,16 @@
               <FileName>filter.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\filter.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf24l01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\nrf24l01.c</FilePath>
+            </File>
+            <File>
+              <FileName>crc16.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\common\easylink\crc16.c</FilePath>
             </File>
           </Files>
         </Group>

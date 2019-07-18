@@ -21,6 +21,20 @@ typedef struct{
 	float pitch;
 	float yaw;
 }ATTITUDE_DEF;
+/* redef */
+typedef struct
+{
+	/* analog channel */
+  unsigned short channel[4];
+  /* digital channel */
+  unsigned short  channel567;
+  /* unique id */
+  unsigned short unique_id;
+  /* crc */
+  unsigned short crc ;
+  /*-------------------------*/
+}rcs_HandleTypeDef;
+
 /* system math def */
 typedef struct
 {
