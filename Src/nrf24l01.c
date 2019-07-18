@@ -86,7 +86,7 @@ static void nrf_thread(void *p)
 		/* loop */
 	while(1)
 	{
-		 vTaskDelayUntil(&lasttime, 1 /* 10ms */ );
+		 vTaskDelayUntil(&lasttime, 15 /* 15ms */ );
 		 /* read nrf data */
 		 if( nrf_fread(0,rc_data,sizeof(rc_data)) != 0 )
 		 {
@@ -95,9 +95,9 @@ static void nrf_thread(void *p)
 			 if( fs_crc16_read(__rtc,sizeof(rcs_HandleTypeDef) - 2 ) == __rtc->crc )
 			 {
 					/* copy data */
-					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));				
+					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));					 
           /* led_freq_ctrl */		
-          if( led_freq_ctrl ++ >= 50 )
+          if( led_freq_ctrl ++ >= 25 )
 					{
 						 /* clear */
 						 led_freq_ctrl = 0;
