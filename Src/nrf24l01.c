@@ -82,6 +82,7 @@ static void nrf_thread(void *p)
 	(void)p;
 	/* init something */	
 	unsigned int lasttime;
+	unsigned char led_freq_ctrl = 0;
 		/* loop */
 	while(1)
 	{
@@ -94,7 +95,16 @@ static void nrf_thread(void *p)
 			 if( fs_crc16_read(__rtc,sizeof(rcs_HandleTypeDef) - 2 ) == __rtc->crc )
 			 {
 					/* copy data */
-					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));				 
+					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));				
+          /* led_freq_ctrl */		
+          if( led_freq_ctrl ++ >= 50 )
+					{
+						 /* clear */
+						 led_freq_ctrl = 0;
+						 /* toggle led green */
+						 GPIOA->ODR ^= 1<<10;
+						 /*------------------*/
+					}						
 			 }
 			 /*-----------*/
 		 }
@@ -711,9 +721,9 @@ unsigned char NRF24L01_RxPacket( unsigned char *rxbuf ,unsigned char *addr)
 	hal_spi_rw_byte( FLUSH_RX );
 	RF24L01_SET_CS_HIGH( );
 	
-	if( RF24L01_GET_IRQ_STATUS( ))
+	while(0 != RF24L01_GET_IRQ_STATUS( ))
 	{
-    return 0;
+    
 	}
 	
 	l_Status = NRF24L01_Read_Reg( STATUS );		//¶Á×´Ì¬¼Ä´æÆ÷
