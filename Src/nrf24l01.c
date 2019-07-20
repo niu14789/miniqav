@@ -67,7 +67,7 @@ static int nrf_heap_init(void)
 static int nrf_config(void)
 {
 	/* create a task run as 1ms per second */
-	xTaskCreate(nrf_thread, "nrf_thread", 128 /* stack size */, 0 , 4 /* priority */ , 0 );
+	xTaskCreate(nrf_thread, "nrf_thread", 128 /* stack size */, 0 , 0 /* priority */ , 0 );
 	/* return OK */
 	return FS_OK;
 }

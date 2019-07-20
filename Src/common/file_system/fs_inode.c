@@ -69,6 +69,12 @@ FAR struct shell_cmd * shell_node_valid(void)
 		}
 		p_shell++;
 	}
+	/* return one */
+	if( shell_max == 1 )
+	{
+		return p_valid->inode->shell_i;
+	}
+  /* retun null */	
 	return (void*)0;
 }
 /*
