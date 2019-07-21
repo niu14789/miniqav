@@ -353,7 +353,7 @@ static int gs_config(void)
 	/* copy data */
 	state_p = sp->enter;
 	/* create a task run as 1ms per second */
-	xTaskCreate(gs_thread, "gs_thread", 128 /* stack size */, 0 , 4 /* priority */ , 0 );
+	xTaskCreate(gs_thread, "gs_thread", 512 /* stack size */, 0 , 4 /* priority */ , 0 );
 	/* return ok */
 	return FS_OK;
 }
@@ -367,10 +367,13 @@ static void gs_thread( void * p )
 	unsigned int freq_ctrl = 0;
 	/* set up linker */
 	gs_set_up();
+	
+	//HAL_UART_Transmit_DMA(&huart1, send_buffer,1);	
+	
 	/* loop */
 	while(1)
 	{
-		 vTaskDelayUntil(&lasttime, 10 /* 1ms */ );
+		 vTaskDelayUntil(&lasttime, 20 /* 1ms */ );
 		 /* send euqler angle */
 		 gs_send_euqler(state_p);
 		 /* send rc */
@@ -382,13 +385,16 @@ static void gs_thread( void * p )
 //			  gs_send_unknow(state_p);
 //		 }
 		 
-		 //HAL_UART_Transmit(&huart1,(unsigned char *)&_act[freq_ctrl],1,1);
+		 //gs_publish_string(&huart1,(unsigned char *)&_act[freq_ctrl],1,1);
 //		
 //		//USART1->DR = _act[freq_ctrl];
 //		
 //		if( freq_ctrl < sizeof(_act) )
 //		{
 //			freq_ctrl ++;
+			/* send */
+	//gs_publish_string(&huart1,buffer,len,0xffffffff);
+   
 //		}
 	}
 }
@@ -422,20 +428,35 @@ static int gs_create(unsigned char * buf , unsigned int buflen , unsigned int pl
 	/* return */
 	return plen + 6;
 }	
+/* send data */
+static void gs_publish_string(void * dsc,unsigned int len)
+{
+	/* get data */
+	unsigned char * ch = dsc;
+	/* push */
+	for( int i = 0 ; i < len ; i ++ )
+	{
+		/* wait until idle */
+		while( ( USART1-> SR & 0x40 ) == 0 );
+		/* push data */
+		USART1->DR = ch[i]; 	
+	}
+}
+     
 /* create euqler buffer */
 static void gs_send_euqler( const state_def * state )
 {
 	/* equler data buffer */
-	short equler[3];
 	unsigned char buffer[16];
+	short equler[3];
 	/* create buffer */
 	equler[0] = (short)(state->att.roll  * 10 );
 	equler[1] = (short)(state->att.pitch * 10 );
-	equler[2] = (short)(state->att.yaw   * 10 );
+	equler[2] = (short)(state->att.yaw);
 	/* create buffer */
 	int len = gs_create(buffer,sizeof(buffer),sizeof(equler),0x6C,equler);
 	/* send */
-	HAL_UART_Transmit(&huart1,buffer,len,0xffffffff);
+	gs_publish_string(buffer,len);		
 }
 /* create battery buffer */
 static void gs_send_battery( const state_def * state )
@@ -447,7 +468,7 @@ static void gs_send_battery( const state_def * state )
 	/* create buffer and send */
 	int len = gs_create(buffer,sizeof(buffer),sizeof(bat),0x6E,bat);
 	/* send */
-	HAL_UART_Transmit(&huart1,buffer,len,0xffffffff);	
+	gs_publish_string(buffer,len);	
 }
 /* create 0x0b 0x65 */
 static void gs_send_unknow(const state_def * state )
@@ -462,7 +483,7 @@ static void gs_send_unknow(const state_def * state )
 	/* create buffer and send */
 	int len = gs_create(buffer,sizeof(buffer),sizeof(unknow),0x65,unknow);
 	/* send */
-	HAL_UART_Transmit(&huart1,buffer,len,0xffffffff);	
+	gs_publish_string(buffer,len);	
 }
 /* create set up buf */
 static void gs_set_up(void)
@@ -491,7 +512,7 @@ static void gs_set_up(void)
 	{
 		len = gs_create(buffer,sizeof(buffer),set_up_tab[i][0],set_up_tab[i][1],&set_up_tab[i][2]);
 		/* send */
-		HAL_UART_Transmit(&huart1,buffer,len,0xffffffff);		
+		gs_publish_string(buffer,len);		
 	}
 }
 

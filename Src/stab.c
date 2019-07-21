@@ -105,14 +105,15 @@ static void stabilizer_thread(void *p)
 	/* init something */
 	unsigned int lasttime;
 	unsigned int freq_ctrl = 0;
+	unsigned int mpu_ready_flag;
 	/* loop */
 	while(1)
 	{
 		 vTaskDelayUntil(&lasttime, 1 /* 1ms */ );
 		 /* read mpu data */
-		 fs_read(mpu_handle,&state.ins,sizeof(state.ins));
+		 mpu_ready_flag = fs_read(mpu_handle,&state.ins,sizeof(state.ins));
 		 /* stabiliter */
-		 if( (freq_ctrl ++) % 2 )
+		 if( ( mpu_ready_flag == sizeof(state.ins) ) && ( ( freq_ctrl ++ ) % 2 ))
 		 {
 		   fs_read(imu_handle,&state,sizeof(state));
 		 }

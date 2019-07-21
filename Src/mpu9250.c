@@ -35,6 +35,10 @@ static int mpu9250_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void
 FS_INODE_REGISTER("mpu9250.d",mpu,mpu9250_heap_init,0);
 /* USER SPI HANDLER */
 extern SPI_HandleTypeDef hspi3;
+/* bias gyro and accel */
+static float bias_gyro[3];
+static float bias_accel[3];
+static float bias_ctrl = 0;
 /* USER SPI HANDLER */
 SPI_HandleTypeDef * mpu_spi_handle;
 /* LPF */
@@ -77,6 +81,28 @@ static unsigned int mpu9250_fread(FAR struct file *filp, FAR void * buffer, unsi
 	}
 	/* read data */
 	mpu9250_read_sensor(buffer);
+	/* bias calibrate */
+	if( bias_ctrl < 1000 )
+	{
+		/* gyro */
+		bias_gyro[0] += ((MPU9250_INS_DEF *)buffer)->gyro[0] / 1000;
+		bias_gyro[1] += ((MPU9250_INS_DEF *)buffer)->gyro[1] / 1000;
+		bias_gyro[2] += ((MPU9250_INS_DEF *)buffer)->gyro[2] / 1000;
+		/* accel */
+		bias_accel[0] += ((MPU9250_INS_DEF *)buffer)->accel[0] / 1000;
+		bias_accel[1] += ((MPU9250_INS_DEF *)buffer)->accel[1] / 1000;
+		bias_accel[2] += (1 - ((MPU9250_INS_DEF *)buffer)->accel[2]) / 1000;
+		/* next station */
+		bias_ctrl ++;
+		/* return 0 */
+		return 0;
+	}
+	/* calibrate data */
+	for( int i = 0 ; i < 3 ; i ++ )
+	{
+	  ((MPU9250_INS_DEF  *)buffer)->gyro[i]  -= bias_gyro[i];
+		((MPU9250_INS_DEF *)buffer)->accel[i]  -= bias_accel[i];
+	}
 	/* return lens */
 	return buflen;
 }
@@ -197,12 +223,12 @@ static void mpu9250_read_sensor( MPU9250_INS_DEF * ins )
 	/* get */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);	
   /* change */
-  ins->accel[0] = (short)((buffer[0] << 8) + buffer[1]) * ACCEL_SENSITIVITY;	
-	ins->accel[1] = (short)((buffer[2] << 8) + buffer[3]) * ACCEL_SENSITIVITY;
+  ins->accel[1] = (short)((buffer[0] << 8) + buffer[1]) * ACCEL_SENSITIVITY;	
+	ins->accel[0] = -(short)((buffer[2] << 8) + buffer[3]) * ACCEL_SENSITIVITY;
 	ins->accel[2] = (short)((buffer[4] << 8) + buffer[5]) * ACCEL_SENSITIVITY;
 	/* get gyro */
-	ins->gyro[0] = (short)((buffer[8]   << 8) + buffer[9])  * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
-	ins->gyro[1] = (short)((buffer[10]  << 8) + buffer[11]) * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
+	ins->gyro[1] = (short)((buffer[8]   << 8) + buffer[9])  * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
+	ins->gyro[0] = -(short)((buffer[10]  << 8) + buffer[11]) * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
 	ins->gyro[2] = (short)((buffer[12]  << 8) + buffer[13]) * GYRO_SENSITIVITY * DEG2RAD ; // transfer to rad
 	/* get temperature */
 	ins->mpu9250_temperature = (short)((buffer[6] << 8) + buffer[7]) * TEMPERATURE_SENSITIVITY + 25;
