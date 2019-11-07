@@ -31,7 +31,7 @@ typedef struct
   /* unique id */
   unsigned short unique_id;
   /* crc */
-  unsigned short crc ;
+  unsigned short status ;
   /*-------------------------*/
 }rcs_HandleTypeDef;
 
@@ -41,6 +41,7 @@ typedef struct
 	MPU9250_INS_DEF ins;
 	MPU9250_MAG_DEF mag;
 	ATTITUDE_DEF att;
+	rcs_HandleTypeDef rc;
 }state_def;
 
 #endif

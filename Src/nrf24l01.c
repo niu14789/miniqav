@@ -46,6 +46,8 @@ SPI_HandleTypeDef * rf_spi_handle;
 /* default channel and rx tx data */
 static unsigned char  tr_addr_g[5] = {INIT_ADDR};
 static unsigned char rf_ch_g = 60;
+/* state */
+static state_def * state_p;
 /*--------------------------------file system--------------------------------*/
 /* defined functions */
 static int nrf_heap_init(void)
@@ -66,15 +68,26 @@ static int nrf_heap_init(void)
 /* create a task for receiving the remote */
 static int nrf_config(void)
 {
+		/* default some data */
+	struct shell_cmd * sp;
+	/* open mpu */
+	if( ( sp = shell_find("state")) == 0 )
+	{
+		/* can not find the state dev */
+		return FS_ERR;
+	}
+	/* copy data */
+	state_p = sp->enter;
 	/* create a task run as 1ms per second */
 	xTaskCreate(nrf_thread, "nrf_thread", 128 /* stack size */, 0 , 0 /* priority */ , 0 );
 	/* return OK */
 	return FS_OK;
 }
-
-unsigned char rc_data[32];
-rcs_HandleTypeDef __rc;
-rcs_HandleTypeDef *__rtc;
+/* some defines */
+static unsigned char rc_data[32];
+static rcs_HandleTypeDef *__rtc;
+/* rssi */
+static unsigned short lost_rc_count = 0;
 /* nrf task */
 static void nrf_thread(void *p)
 {
@@ -83,19 +96,21 @@ static void nrf_thread(void *p)
 	/* init something */	
 	unsigned int lasttime;
 	unsigned char led_freq_ctrl = 0;
+	unsigned int armed_count = 500000;
 		/* loop */
 	while(1)
 	{
-		 vTaskDelayUntil(&lasttime, 15 /* 15ms */ );
+		 vTaskDelayUntil(&lasttime, 10 /* 15ms */ );
 		 /* read nrf data */
-		 if( nrf_fread(0,rc_data,sizeof(rc_data)) != 0 )
+		 if( nrf_fread(0,rc_data,sizeof(rc_data)) == sizeof(rcs_HandleTypeDef) )
 		 {
+			 /* force transfer */
 			 __rtc = ( rcs_HandleTypeDef * )rc_data;
 			 /* check crc */
-			 if( fs_crc16_read(__rtc,sizeof(rcs_HandleTypeDef) - 2 ) == __rtc->crc )
+			 if( fs_crc16_read(__rtc,sizeof(rcs_HandleTypeDef) - 2 ) == __rtc->status )
 			 {
 					/* copy data */
-					memcpy((void *)&__rc,(const void *)rc_data,sizeof(__rc));					 
+					memcpy((void *)&state_p->rc,(const void *)rc_data,sizeof(rcs_HandleTypeDef) - 2 );					 
           /* led_freq_ctrl */		
           if( led_freq_ctrl ++ >= 25 )
 					{
@@ -104,10 +119,66 @@ static void nrf_thread(void *p)
 						 /* toggle led green */
 						 GPIOA->ODR ^= 1<<10;
 						 /*------------------*/
-					}						
+					}		
+					/* armed and disarmed */
+					if( state_p->rc.channel[0] > 980 )
+					{
+						armed_count ++;
+					}
+          else if( state_p->rc.channel[0] < 20 )
+					{
+						armed_count --;
+					}
+          else
+				  {
+						armed_count = 500000;
+					}	
+          /* check */
+          if( armed_count >= 	500000 + 25 ) // 1s
+					{
+						state_p->rc.status |= 0x02;
+						/* enable */
+						GPIOA->ODR &=~ (1<<9);
+						/*---------*/
+					}
+					else if( armed_count <= 500000 - 25 ) // 1s
+					{
+						state_p->rc.status &=~ 0x02;
+						/* armed */
+						GPIOA->ODR |= (1<<9);
+						/*---------*/						
+					}
+					else
+					{
+						/* nothing to do */
+					}
+          /* failsave . clean status */
+					lost_rc_count = 0;
+					/* notice */
+					state_p->rc.status |= 0x01;
+          /*----------*/					
 			 }
-			 /*-----------*/
+			 else
+			 {
+				 /* lost count cream */
+				 lost_rc_count++;				 
+			 }
+			 /*------------------------*/
 		 }
+		 else
+		 {
+			 /* lost count cream */
+			 lost_rc_count++;
+		 }
+		 /* set lost frame noticifaction */
+		 if( lost_rc_count >= 20 )
+		 {
+			 state_p->rc.status &=~ 0x01;
+			 /* led on */
+			 /* toggle led green */
+			 GPIOA->ODR &=~ (1<<10);
+		 }
+		 /*------------------------------*/
 	}
 }
 /* file & driver 's interface */
@@ -721,9 +792,16 @@ unsigned char NRF24L01_RxPacket( unsigned char *rxbuf ,unsigned char *addr)
 	hal_spi_rw_byte( FLUSH_RX );
 	RF24L01_SET_CS_HIGH( );
 	
+	unsigned int rxtt = 0;
+	
 	while(0 != RF24L01_GET_IRQ_STATUS( ))
 	{
-    
+    rxtt++;
+		
+		if( rxtt >= 200000 )
+		{
+			return 0;
+		}
 	}
 	
 	l_Status = NRF24L01_Read_Reg( STATUS );		//¶Á×´Ì¬¼Ä´æÆ÷

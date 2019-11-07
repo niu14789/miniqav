@@ -37,7 +37,8 @@ FS_INODE_REGISTER("mpu9250.d",mpu,mpu9250_heap_init,0);
 extern SPI_HandleTypeDef hspi3;
 /* bias gyro and accel */
 static float bias_gyro[3];
-static float bias_ctrl = 0;
+static unsigned int bias_ctrl = 0;
+static float bias_gyro_value[3][1000];
 /* USER SPI HANDLER */
 SPI_HandleTypeDef * mpu_spi_handle;
 /* LPF */
@@ -87,8 +88,42 @@ static unsigned int mpu9250_fread(FAR struct file *filp, FAR void * buffer, unsi
 		bias_gyro[0] += ((MPU9250_INS_DEF *)buffer)->gyro[0] / 1000;
 		bias_gyro[1] += ((MPU9250_INS_DEF *)buffer)->gyro[1] / 1000;
 		bias_gyro[2] += ((MPU9250_INS_DEF *)buffer)->gyro[2] / 1000;
+		/* save data */
+		bias_gyro_value[0][bias_ctrl] = ((MPU9250_INS_DEF *)buffer)->gyro[0];
+		bias_gyro_value[1][bias_ctrl] = ((MPU9250_INS_DEF *)buffer)->gyro[1];
+		bias_gyro_value[2][bias_ctrl] = ((MPU9250_INS_DEF *)buffer)->gyro[2];
 		/* next station */
 		bias_ctrl ++;
+		/* over */
+		if( bias_ctrl >= 1000 )
+		{
+			float mean[3] = {0.0f,0.0f,0.0f};
+			/* mean */
+			for( int i = 0 ; i < 1000 ; i ++ )
+			{
+				/* mean */
+				mean[0] += ( bias_gyro_value[0][i] - bias_gyro[0] ) * ( bias_gyro_value[0][i] - bias_gyro[0] );
+				mean[1] += ( bias_gyro_value[1][i] - bias_gyro[1] ) * ( bias_gyro_value[1][i] - bias_gyro[1] );
+				mean[2] += ( bias_gyro_value[2][i] - bias_gyro[2] ) * ( bias_gyro_value[2][i] - bias_gyro[2] );
+			}
+			/* check */
+			if( mean[0] < 10 && mean[1] < 10 && mean[2] < 10 )
+			{
+				/* ok pass . close the led */
+				GPIOA->ODR |= 1<<9; // close red led
+				/* return */
+				return FS_OK;
+				/*---------*/
+			}
+			else
+			{
+				bias_ctrl = 0;//error
+				/* clear var */
+				bias_gyro[0] = 0;
+				bias_gyro[1] = 0;
+				bias_gyro[2] = 0;
+			}
+		}
 		/* return 0 */
 		return 0;
 	}
