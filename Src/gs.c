@@ -375,7 +375,7 @@ static void gs_thread( void * p )
 	{
 		 vTaskDelayUntil(&lasttime, 20 /* 1ms */ );
 		 /* send euqler angle */
-		 gs_send_euqler(state_p);
+//		 gs_send_euqler(state_p);
 		 /* send rc */
 //		 if( ! ( freq_ctrl ++ % 8 ) )
 //		 {

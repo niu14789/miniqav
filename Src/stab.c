@@ -104,7 +104,7 @@ static void stabilizer_thread(void *p)
 	(void)p;
 	/* init something */
 	unsigned int lasttime;
-	unsigned int freq_ctrl = 0;
+	unsigned int freq_ctrl = 1;
 	unsigned int mpu_ready_flag;
 	/* loop */
 	while(1)
@@ -113,8 +113,9 @@ static void stabilizer_thread(void *p)
 		 /* read mpu data */
 		 mpu_ready_flag = fs_read(mpu_handle,&state.ins,sizeof(state.ins));
 		 /* stabiliter */
-		 if( ( mpu_ready_flag == sizeof(state.ins) ) && ( ( freq_ctrl ++ ) % 2 ))
+		 if( ( mpu_ready_flag == sizeof(state.ins) ) && ( (( freq_ctrl ++ ) % 4 ) == 0) )
 		 {
+       /* 250HZ */
 		   fs_read(imu_handle,&state,sizeof(state));
 		 }
 	}

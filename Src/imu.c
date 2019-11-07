@@ -25,21 +25,12 @@
 #include "fs.h"
 #include "mpu9250.h"
 #include "state.h"
-/* some decleres */
-int IMUupdate( state_def * state );
+/* some decleres  */
+static int IMUupdate( state_def * state );
 static int imu_heap_init(void);
 static struct file * imu_fopen (FAR struct file *filp);
 static unsigned int imu_fread(FAR struct file *filp, FAR void * buffer, unsigned int buflen);
 static int imu_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pri_data);
-/* proportional gains */
-#define Kp    (10.0f)  /* proportional gain governs rate of convergence to accelerometer/magnetometer */
-#define Ki    (0.008f) /* integral gain governs rate of convergence of gyroscope biases */
-#define halfT (0.001f) /* half the sample period */
-/* define quaternion elements for four */
-/* quaternion elements representing the estimated orientation */
-static float q0 = 1 , q1 = 0 , q2 = 0 , q3 = 0 ;   
-/* integral error default */
-static float exInt = 0, eyInt = 0, ezInt = 0; /* scaled integral error */
 /* USER CODE BEGIN Includes */
 FS_INODE_REGISTER("imu.a",imu,imu_heap_init,0);
 /* defined functions */
@@ -101,85 +92,122 @@ static int imu_ioctrl(FAR struct file *filp, int cmd, unsigned long arg,void *pr
 	/* return ret */
 	return ret;
 }
-/*
-  The input angular velocity unit of complementary 
-	filtering attitude calculation function should be rad/s.
-*/
-int IMUupdate( state_def * state )
+/* data fusion */
+/* some decleres */
+static float Kp = 0.4f;
+static float Ki = 0.001f;
+static float exInt = 0.0f;
+static float eyInt = 0.0f;
+static float ezInt = 0.0f;
+/* Q */
+static float q0 = 1.0f;
+static float q1 = 0.0f;
+static float q2 = 0.0f;
+static float q3 = 0.0f;	
+static float rMat[3][3];
+/* calutate rotation matrix */
+static void imuComputeRotationMatrix(void)
 {
-	/* some defines */
-  float norm;
-  float vx, vy, vz;// wx, wy, wz;
-  float ex, ey, ez;
-  /* tmp acc gyro data */
-	float acc_t[3],gyro_t[3];
-	/* rotation matrix */
-  float q0q0 = q0*q0;
-  float q0q1 = q0*q1;
-  float q0q2 = q0*q2;
-  /* Q0 */
-  float q1q1 = q1*q1;
-  /* Q1 */
-  float q1q3 = q1*q3;
-  float q2q2 = q2*q2;
-  float q2q3 = q2*q3;
-  float q3q3 = q3*q3;
-  /* is accel OK ? */
-  if( state->ins.accel[0] * 
-		  state->ins.accel[1] *
-	    state->ins.accel[2] == 0 )
-	{
-		/* no need . return direction */
-    return FS_OK;
-	}
-	/* normalization */
-  norm = sqrt( state->ins.accel[0] * state->ins.accel[0] + 
-	             state->ins.accel[1] * state->ins.accel[1] + 
-	             state->ins.accel[2] * state->ins.accel[2]);  
-	/* calibrate the accel */
-  acc_t[0] = state->ins.accel[0] / norm;
-  acc_t[1] = state->ins.accel[1] / norm;
-  acc_t[2] = state->ins.accel[2] / norm;
-  /* estimated direction of gravity and flux (v and w) */
-  vx = 2 * ( q1q3 - q0q2 );   
-  vy = 2 * ( q0q1 + q2q3 );
-  vz = q0q0 - q1q1 - q2q2 + q3q3 ;
-  /* error is sum of cross product between reference 
-	direction of fields and direction measured by sensors */
-  ex = ( acc_t[1] * vz - acc_t[2] * vy ) ;                                         
-  ey = ( acc_t[2] * vx - acc_t[0] * vz ) ;
-  ez = ( acc_t[0] * vy - acc_t[1] * vx ) ;
-  /* error os sum of cross prodect between refefence 
-	direction of fields and direction measeured by sensors */
-  exInt += ex * Ki;
-  eyInt += ey * Ki;
-  ezInt += ez * Ki;
-  /* adjusted gyroscope measurements */
-  gyro_t[0] = state->ins.gyro[0] + Kp * ex + exInt; 
-  gyro_t[1] = state->ins.gyro[1] + Kp * ey + eyInt;
-  gyro_t[2] = state->ins.gyro[2] + Kp * ez + ezInt; 
-  /* integrate quaternion rate and normalise */
-  q0 += (-q1 * gyro_t[0] - q2 * gyro_t[1] - q3 * gyro_t[2] ) * halfT;
-  q1 += ( q0 * gyro_t[0] + q2 * gyro_t[2] - q3 * gyro_t[1] ) * halfT;
-  q2 += ( q0 * gyro_t[1] - q1 * gyro_t[2] + q3 * gyro_t[0] ) * halfT;
-  q3 += ( q0 * gyro_t[2] + q1 * gyro_t[1] - q2 * gyro_t[0] ) * halfT;
-  /* normalise quaternion */
-  norm = sqrt( q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3 );
-	/* calibrate quaternion elements */
-  q0 /= norm ;
-  q1 /= norm ;
-  q2 /= norm ;
-  q3 /= norm ;
-  /* calibrate the drone's attitude */
-  state->att.yaw = atan2( 2 * q1 * q2 + 2 * q0 * q3, -2 * q2*q2 - 2 * q3* q3 + 1 ) * RAD2DEG; /* yaw */
-  state->att.pitch  = asin( -2 * q1 * q3 + 2 * q0 * q2 ) * RAD2DEG; /* pitch */
-  state->att.roll = atan2( 2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2 * q2 + 1 ) * RAD2DEG; /* roll */
-	/* return OK */
-	return FS_OK;
+	float q1q1 = q1 * q1;
+	float q2q2 = q2 * q2;
+	float q3q3 = q3 * q3;
+
+	float q0q1 = q0 * q1;
+	float q0q2 = q0 * q2;
+	float q0q3 = q0 * q3;
+	float q1q2 = q1 * q2;
+	float q1q3 = q1 * q3;
+	float q2q3 = q2 * q3;
+
+	rMat[0][0] = 1.0f - 2.0f * q2q2 - 2.0f * q3q3;
+	rMat[0][1] = 2.0f * (q1q2 + -q0q3);
+	rMat[0][2] = 2.0f * (q1q3 - -q0q2);
+
+	rMat[1][0] = 2.0f * (q1q2 - -q0q3);
+	rMat[1][1] = 1.0f - 2.0f * q1q1 - 2.0f * q3q3;
+	rMat[1][2] = 2.0f * (q2q3 + -q0q1);
+
+	rMat[2][0] = 2.0f * (q1q3 + -q0q2);
+	rMat[2][1] = 2.0f * (q2q3 - -q0q1);
+	rMat[2][2] = 1.0f - 2.0f * q1q1 - 2.0f * q2q2;
 }
-/* end of files */
+/* step1 */
+static float invSqrt(float x)	/*快速开平方求倒*/
+{
+	float halfx = 0.5f * x;
+	float y = x;
+	long i = *(long*)&y;
+	i = 0x5f3759df - (i>>1);
+	y = *(float*)&i;
+	y = y * (1.5f - (halfx * y * y));
+	return y;
+}
+/* data fusion start */
+static int IMUupdate( state_def * state )
+{
+	float normalise;
+	float ex, ey, ez;
+  /* dt */
+	float dt = 1.0f / 250.0f;	
+	/* halT */
+	float halfT = 0.5f * ( dt );
+  /* change to deg */
+	state->ins.gyro[0] = state->ins.gyro[0] * DEG2RAD;	/* 度转弧度 */
+	state->ins.gyro[1] = state->ins.gyro[1] * DEG2RAD;
+	state->ins.gyro[2] = state->ins.gyro[2] * DEG2RAD;
+	
+	/* 加速度计输出有效时,利用加速度计补偿陀螺仪*/
+	if((state->ins.accel[0] != 0.0f) || (state->ins.accel[1] != 0.0f) || (state->ins.accel[2] != 0.0f))
+	{
+		/*单位化加速计测量值*/
+		normalise = invSqrt(state->ins.accel[0] * state->ins.accel[0] + state->ins.accel[1] * state->ins.accel[1] + state->ins.accel[2] * state->ins.accel[2]);
+		state->ins.accel[0] *= normalise;
+		state->ins.accel[1] *= normalise;
+		state->ins.accel[2] *= normalise;
 
+		/*加速计读取的方向与重力加速计方向的差值，用向量叉乘计算*/
+		ex = (state->ins.accel[1] * rMat[2][2] - state->ins.accel[2] * rMat[2][1]);
+		ey = (state->ins.accel[2] * rMat[2][0] - state->ins.accel[0] * rMat[2][2]);
+		ez = (state->ins.accel[0] * rMat[2][1] - state->ins.accel[1] * rMat[2][0]);
+		
+		/*误差累计，与积分常数相乘*/
+		exInt += Ki * ex * dt ;  
+		eyInt += Ki * ey * dt ;
+		ezInt += Ki * ez * dt ;
+		
+		/*用叉积误差来做PI修正陀螺零偏，即抵消陀螺读数中的偏移量*/
+		state->ins.gyro[0] += Kp * ex + exInt;
+		state->ins.gyro[1] += Kp * ey + eyInt;
+		state->ins.gyro[2] += Kp * ez + ezInt;
+	}
+	/* 一阶近似算法，四元数运动学方程的离散化形式和积分 */
+	float q0Last = q0;
+	float q1Last = q1;
+	float q2Last = q2;
+	float q3Last = q3;
+	q0 += (-q1Last * state->ins.gyro[0] - q2Last * state->ins.gyro[1] - q3Last * state->ins.gyro[2]) * halfT;
+	q1 += ( q0Last * state->ins.gyro[0] + q2Last * state->ins.gyro[2] - q3Last * state->ins.gyro[1]) * halfT;
+	q2 += ( q0Last * state->ins.gyro[1] - q1Last * state->ins.gyro[2] + q3Last * state->ins.gyro[0]) * halfT;
+	q3 += ( q0Last * state->ins.gyro[2] + q1Last * state->ins.gyro[1] - q2Last * state->ins.gyro[0]) * halfT;
+	
+	/*单位化四元数*/
+	normalise = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+	q0 *= normalise;
+	q1 *= normalise;
+	q2 *= normalise;
+	q3 *= normalise;
+	
+	imuComputeRotationMatrix();	/*计算旋转矩阵*/
+	
+	/*计算roll pitch yaw 欧拉角*/
+	state->att.pitch = -asinf(rMat[2][0]) * RAD2DEG; 
+	state->att.roll = atan2f(rMat[2][1], rMat[2][2]) * RAD2DEG;
+	state->att.yaw = atan2f(rMat[1][0], rMat[0][0]) * RAD2DEG;
+	/* return */
+	return FS_OK;;
+}
 
+/************************************************ end of file *******************************************************/
 
 
 

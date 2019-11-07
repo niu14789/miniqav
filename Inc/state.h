@@ -39,6 +39,7 @@ typedef struct
 typedef struct
 {
 	MPU9250_INS_DEF ins;
+	MPU9250_MAG_DEF mag;
 	ATTITUDE_DEF att;
 }state_def;
 

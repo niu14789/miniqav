@@ -155,7 +155,7 @@ enum Gbw { // gyro bandwidth
 	
 /* config */
 
-#define USED_LPF              0  /* enable / disable LPF ( low pass filter ) */
+#define USED_LPF              1  /* enable / disable LPF ( low pass filter ) */
 #define USED_MAG              0  /* as default . disable the mag sensor */
 
 /* some decleare */
@@ -167,6 +167,9 @@ static unsigned char mpu9250_read_reg(unsigned char reg);
 static void mpu9250_write_reg(unsigned char reg,unsigned char data);
 static int mpu9250_check_reg(unsigned char reg,unsigned char data);
 static int mpu9250_init(void);
+#if USED_MAG
+static void mpu9250_read_mag( MPU9250_MAG_DEF * mag );
+#endif
 /*---------------*/
 #endif
 
